@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>批量多语言翻译</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background-color: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+      margin: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: var(--vscode-editor-foreground);
+      border-bottom: 2px solid var(--vscode-focusBorder);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .description {
+      background-color: var(--vscode-textBlockQuote-background);
+      border-left: 4px solid var(--vscode-focusBorder);
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+
+    .description h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .description ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .description li {
+      margin: 5px 0;
+      line-height: 1.5;
+    }
+
+    .file-info {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      line-height: 1.6;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: flex-end;
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+
+    button:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .check-results {
+      background-color: var(--vscode-textBlockQuote-background);
+      border-left: 4px solid var(--vscode-focusBorder);
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+
+    .check-results h3 {
+      margin: 0 0 15px 0;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .check-results ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .check-results li {
+      margin: 8px 0;
+      line-height: 1.5;
+    }
+
+    .check-results .no-translation {
+      color: var(--vscode-notificationsInfoIcon-foreground);
+      font-weight: 500;
+    }
+
+    .check-results .need-translation {
+      color: var(--vscode-notificationsWarningIcon-foreground);
+      font-weight: 500;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--vscode-panel-border);
+      border-radius: 50%;
+      border-top-color: var(--vscode-focusBorder);
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .success {
+      color: var(--vscode-notificationsInfoIcon-foreground);
+    }
+
+    .warning {
+      color: var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    .error-result {
+      color: var(--vscode-errorForeground);
+    }
+
+    .translate-results {
+      margin-top: 20px;
+      padding: 15px;
+      background: var(--vscode-editor-background);
+      border-radius: 8px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .file-content {
+      padding: 8px;
+    }
+
+    .translate-item {
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      margin-bottom: 8px;
+    }
+
+    .translate-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .translate-item .status {
+      margin-right: 8px;
+      font-size: 16px;
+    }
+
+    .translate-item .status.translating {
+      color: var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    .translate-item .status.success {
+      color: var(--vscode-notificationsInfoIcon-foreground);
+    }
+
+    .translate-item .status.error {
+      color: var(--vscode-errorForeground);
+    }
+
+    .translate-item .code {
+      font-weight: bold;
+      margin-right: 8px;
+      color: var(--vscode-focusBorder);
+    }
+
+    .translate-item .message {
+      flex: 1;
+      margin-right: 8px;
+    }
+
+    .translate-item .line {
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
+    }
+
+    .file-card {
+      margin: 15px 0;
+      background: var(--vscode-panel-background);
+      border-radius: 8px;
+      border: 1px solid var(--vscode-panel-border);
+      overflow: hidden;
+    }
+
+    .file-card.translating {
+      border-left: 4px solid var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    .file-card.completed {
+      border-left: 4px solid #28a745;
+    }
+
+    .file-card.failed {
+      border-left: 4px solid var(--vscode-errorForeground);
+    }
+
+    .file-header {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+
+    .file-header .status {
+      margin-right: 8px;
+      font-size: 16px;
+    }
+
+    .file-header .file-title {
+      font-weight: bold;
+      color: var(--vscode-foreground);
+    }
+
+    .translate-summary {
+      margin-top: 20px;
+      padding: 15px;
+      background: var(--vscode-panel-background);
+      border-radius: 8px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .translate-summary h4 {
+      margin: 0 0 15px 0;
+      color: var(--vscode-focusBorder);
+    }
+
+    .summary-stats {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .stat-item {
+      font-weight: bold;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: var(--vscode-editor-background);
+      border: 1px solid;
+    }
+
+    .stat-item.total {
+      color: var(--vscode-focusBorder);
+      border-color: var(--vscode-focusBorder);
+    }
+
+    .stat-item.success {
+      color: #28a745;
+      border-color: #28a745;
+    }
+
+    .stat-item.error {
+      color: var(--vscode-errorForeground);
+      border-color: var(--vscode-errorForeground);
+    }
+
+    .section-header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: none;
+      border: none;
+      color: var(--vscode-descriptionForeground);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .close-btn:hover {
+      background: var(--vscode-toolbar-hoverBackground);
+      color: var(--vscode-foreground);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>批量多语言翻译</h1>
+
+    <div class="description">
+      <h3>功能说明:</h3>
+      <ul>
+        <li>自动根据"文件配置"批量翻译所有目标语言文件</li>
+        <li>无需手动选择,直接点击按钮即可</li>
+        <li>支持预览翻译计划和一键批量翻译</li>
+      </ul>
+    </div>
+
+    <div class="file-info" id="fileInfo">
+      <div class="loading">
+        <div class="spinner"></div>
+        正在加载文件信息...
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button id="previewBtn" onclick="previewPlan()">预览计划</button>
+      <button id="translateBtn" onclick="startTranslate()">开始翻译</button>
+    </div>
+
+    <div class="check-results" id="checkResults" style="display: none;">
+      <div class="section-header">
+        <h3 id="checkTitle">将从 zh-CN.js 检查到:</h3>
+        <button class="close-btn" onclick="closeCheckResults()" title="关闭">×</button>
+      </div>
+      <ul id="checkList">
+      </ul>
+    </div>
+
+    <div class="translate-results" id="translateResults" style="display: none;">
+      <div class="section-header">
+        <h3>翻译进度:</h3>
+        <button class="close-btn" onclick="closeTranslateResults()" title="关闭">×</button>
+      </div>
+      <div id="translateProgress">
+        <div class="loading">
+          <div class="spinner"></div>
+          正在翻译中...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+
+    // 页面加载时获取文件信息
+    window.addEventListener('load', () => {
+      loadFileInfo();
+    });
+
+    // 加载文件信息
+    function loadFileInfo() {
+      vscode.postMessage({ command: 'getSourceFiles' });
+    }
+
+    // 预览计划
+    function previewPlan() {
+      const checkResults = document.getElementById('checkResults');
+      const checkList = document.getElementById('checkList');
+
+      checkList.innerHTML = '<div class="loading"><div class="spinner"></div>正在检查翻译计划...</div>';
+      checkResults.style.display = 'block';
+
+      vscode.postMessage({ command: 'previewPlan' });
+    }
+
+    // 开始翻译
+    function startTranslate() {
+      const translateBtn = document.getElementById('translateBtn');
+      translateBtn.textContent = '翻译中...';
+      translateBtn.disabled = true;
+
+      // 显示翻译进度区域
+      const translateResults = document.getElementById('translateResults');
+      const translateProgress = document.getElementById('translateProgress');
+      translateProgress.innerHTML = '<div class="loading"><div class="spinner"></div>正在翻译中...</div>';
+      translateResults.style.display = 'block';
+
+      vscode.postMessage({ command: 'startTranslate' });
+    }
+
+    // 关闭预览计划
+    function closeCheckResults() {
+      const checkResults = document.getElementById('checkResults');
+      checkResults.style.display = 'none';
+    }
+
+    // 关闭翻译进度
+    function closeTranslateResults() {
+      const translateResults = document.getElementById('translateResults');
+      translateResults.style.display = 'none';
+    }
+
+    // 监听扩展消息
+    window.addEventListener('message', event => {
+      const message = event.data;
+
+      switch (message.command) {
+        case 'fileInfoResult':
+          handleFileInfoResult(message);
+          break;
+        case 'previewResult':
+          handlePreviewResult(message);
+          break;
+        case 'translateProgress':
+          handleTranslateProgress(message);
+          break;
+        case 'translateResult':
+          handleTranslateResult(message);
+          break;
+      }
+    });
+
+    // 处理文件信息结果
+    function handleFileInfoResult(message) {
+      const fileInfo = document.getElementById('fileInfo');
+      const checkTitle = document.getElementById('checkTitle');
+
+      if (!message.success) {
+        fileInfo.innerHTML = `<div class="error-result">❌ ${message.message}</div>`;
+        return;
+      }
+
+      const sourceFile = message.sourceFile || 'zh-CN.js';
+      const targetFiles = message.files || [];
+      const targetFileNames = targetFiles.map(f => f.name).join(', ');
+
+      fileInfo.innerHTML = `源文件: ${sourceFile}, 目标语言文件: ${targetFileNames}`;
+      checkTitle.innerHTML = `将从 ${sourceFile} 检查到:`;
+    }
+
+    // 处理预览结果
+    function handlePreviewResult(message) {
+      const checkList = document.getElementById('checkList');
+
+      if (!message.success) {
+        checkList.innerHTML = `<div class="error-result">❌ ${message.message}</div>`;
+        return;
+      }
+
+      let html = '';
+      message.results.forEach(result => {
+        if (result.missingCount === 0) {
+          html += `<li class="no-translation">${result.file} （缺失 0 项）</li>`;
+        } else {
+          html += `<li class="need-translation">${result.file} （缺失 ${result.missingCount} 项）`;
+
+          // 如果有缺失的错误码，显示详细信息
+          if (result.missingCodes && result.missingCodes.length > 0) {
+            html += '<ul>';
+            result.missingCodes.forEach(missingCode => {
+              const lineText = missingCode.lineNumber > 0 ? `（第${missingCode.lineNumber}行）` : '';
+              html += `<li>${missingCode.code}: ${missingCode.message}${lineText}</li>`;
+            });
+            html += '</ul>';
+          }
+
+          html += '</li>';
+        }
+      });
+
+      checkList.innerHTML = html;
+    }
+
+    // 处理翻译进度
+    function handleTranslateProgress(message) {
+      const translateProgress = document.getElementById('translateProgress');
+
+      if (message.type === 'start') {
+        // 开始翻译新文件时，创建新的文件卡片
+        const fileCardHtml = `
+          <div class="file-card translating" data-file="${message.file}">
+            <div class="file-header">
+              <span class="status translating">🔄</span>
+              <span class="file-title">正在翻译 ${message.file}：</span>
+            </div>
+            <div class="file-content">
+            </div>
+          </div>
+        `;
+        translateProgress.innerHTML += fileCardHtml;
+      } else if (message.type === 'success') {
+        // 在对应文件的卡片中添加翻译结果
+        const fileCard = translateProgress.querySelector(`[data-file="${message.file}"]`);
+        if (fileCard) {
+          const fileContent = fileCard.querySelector('.file-content');
+          if (fileContent) {
+            const progressHtml = `
+              <div class="translate-item">
+                <span class="status success">✅</span>
+                <span class="code">${message.code}</span>
+                <span class="message">${message.translatedMessage}</span>
+                <span class="line">(第${message.lineNumber}行)</span>
+              </div>
+            `;
+            fileContent.innerHTML += progressHtml;
+          }
+        }
+      } else if (message.type === 'error') {
+        // 在对应文件的卡片中添加错误信息
+        const fileCard = translateProgress.querySelector(`[data-file="${message.file}"]`);
+        if (fileCard) {
+          const fileContent = fileCard.querySelector('.file-content');
+          if (fileContent) {
+            const progressHtml = `
+              <div class="translate-item">
+                <span class="status error">❌</span>
+                <span class="code">${message.code}</span>
+                <span class="message">翻译失败: ${message.error}</span>
+                <span class="line">(第${message.lineNumber}行)</span>
+              </div>
+            `;
+            fileContent.innerHTML += progressHtml;
+          }
+        }
+      } else if (message.type === 'fileComplete') {
+        // 文件完成时，更新文件卡片状态
+        const fileCard = translateProgress.querySelector(`[data-file="${message.file}"]`);
+        if (fileCard) {
+          const fileHeader = fileCard.querySelector('.file-header');
+
+          if (message.success) {
+            const completedText = message.translated > 0 ? `（完成 ${message.translated} 项）：` : '（缺失 0 项）';
+            fileHeader.innerHTML = `
+              <span class="status success">✅</span>
+              <span class="file-title">${message.file}${completedText}</span>
+            `;
+            fileCard.className = 'file-card completed';
+
+            if (message.translated === 0) {
+              const fileContent = fileCard.querySelector('.file-content');
+              if (fileContent) {
+                fileContent.remove();
+              }
+            }
+          } else {
+            fileHeader.innerHTML = `
+              <span class="status error">❌</span>
+              <span class="file-title">${message.file}（翻译失败）：</span>
+            `;
+            fileCard.className = 'file-card failed';
+          }
+        }
+      }
+    }
+
+    // 处理翻译结果
+    function handleTranslateResult(message) {
+      const translateBtn = document.getElementById('translateBtn');
+      translateBtn.textContent = '开始翻译';
+      translateBtn.disabled = false;
+
+      if (!message.success) {
+        const translateProgress = document.getElementById('translateProgress');
+        translateProgress.innerHTML += `<div class="error-result">❌ 翻译失败: ${message.message}</div>`;
+        return;
+      }
+
+      // 计算统计信息
+      const results = message.results;
+      const totalFiles = results.length;
+      const successFiles = results.filter(r => r.success).length;
+      const totalTranslated = results.reduce((sum, r) => sum + (r.translated || 0), 0);
+      const totalErrors = results.reduce((sum, r) => sum + (r.errors?.length || 0), 0);
+
+      const translateProgress = document.getElementById('translateProgress');
+
+      // 移除"正在翻译中..."的加载状态
+      const loadingElements = translateProgress.querySelectorAll('.loading');
+      loadingElements.forEach(element => element.remove());
+
+      const summaryHtml = `
+        <div class="translate-summary">
+          <h4>📊 翻译完成统计</h4>
+          <div class="summary-stats">
+            <span class="stat-item total">成功: ${successFiles}/${totalFiles} 个文件</span>
+            <span class="stat-item success">翻译: ${totalTranslated} 个错误码</span>
+            <span class="stat-item error">失败: ${totalErrors} 个</span>
+          </div>
+        </div>
+      `;
+      translateProgress.innerHTML += summaryHtml;
+    }
+  </script>
+</body>
+
+</html>

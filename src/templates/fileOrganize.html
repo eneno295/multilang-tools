@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>整理文件</title>
+  <style>
+    body {
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+      color: var(--vscode-foreground);
+      background: var(--vscode-editor-background);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: var(--vscode-focusBorder);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .description {
+      background: var(--vscode-panel-background);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .description h3 {
+      margin: 0 0 10px 0;
+      color: var(--vscode-focusBorder);
+    }
+
+    .description ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .description li {
+      margin: 5px 0;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .file-info {
+      background: var(--vscode-panel-background);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--vscode-panel-border);
+      border-top: 2px solid var(--vscode-focusBorder);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+
+    button {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+
+    button:disabled {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      cursor: not-allowed;
+    }
+
+    .organize-results {
+      background: var(--vscode-panel-background);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid var(--vscode-panel-border);
+      display: none;
+    }
+
+    .section-header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: none;
+      border: none;
+      color: var(--vscode-descriptionForeground);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .close-btn:hover {
+      background: var(--vscode-toolbar-hoverBackground);
+      color: var(--vscode-foreground);
+    }
+
+    .organize-results h3 {
+      margin: 0;
+      color: var(--vscode-focusBorder);
+    }
+
+    .result-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+
+    .result-item:last-child {
+      border-bottom: none;
+    }
+
+    .result-item .status {
+      margin-right: 8px;
+      font-size: 16px;
+    }
+
+    .result-item .status.success {
+      color: #28a745;
+    }
+
+    .result-item .status.error {
+      color: var(--vscode-errorForeground);
+    }
+
+    .result-item .file-name {
+      font-weight: bold;
+      margin-right: 8px;
+      color: var(--vscode-foreground);
+    }
+
+    .result-item .message {
+      color: var(--vscode-descriptionForeground);
+      flex: 1;
+    }
+
+    .error-result {
+      color: var(--vscode-errorForeground);
+      background: var(--vscode-inputValidation-errorBackground);
+      border: 1px solid var(--vscode-inputValidation-errorBorder);
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+
+    .success-result {
+      color: #28a745;
+      background: var(--vscode-inputValidation-infoBackground);
+      border: 1px solid var(--vscode-inputValidation-infoBorder);
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>整理文件</h1>
+
+    <div class="description">
+      <h3>功能说明:</h3>
+      <ul>
+        <li>整理源文件和目标语言文件中的错误码顺序</li>
+        <li>按错误码字母顺序重新排列，保持文件结构不变</li>
+        <li>支持整理单个源文件或批量整理目标文件</li>
+      </ul>
+    </div>
+
+    <div class="file-info" id="fileInfo">
+      <div class="loading">
+        <div class="spinner"></div>
+        正在加载文件信息...
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button id="organizeSourceBtn" onclick="organizeSourceFile()">整理源文件</button>
+      <button id="organizeTargetBtn" onclick="organizeTargetFiles()">整理目标文件</button>
+    </div>
+
+    <div class="organize-results" id="organizeResults">
+      <div class="section-header">
+        <h3 id="organizeTitle">整理结果:</h3>
+        <button class="close-btn" onclick="closeOrganizeResults()" title="关闭">×</button>
+      </div>
+      <div id="organizeList">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+
+    // 页面加载时获取文件信息
+    window.addEventListener('load', () => {
+      loadFileInfo();
+    });
+
+    // 加载文件信息
+    function loadFileInfo() {
+      vscode.postMessage({ command: 'getFileInfo' });
+    }
+
+    // 整理源文件
+    function organizeSourceFile() {
+      const organizeSourceBtn = document.getElementById('organizeSourceBtn');
+      organizeSourceBtn.textContent = '整理中...';
+      organizeSourceBtn.disabled = true;
+
+      // 显示整理结果区域
+      const organizeResults = document.getElementById('organizeResults');
+      const organizeList = document.getElementById('organizeList');
+      organizeList.innerHTML = '<div class="loading"><div class="spinner"></div>正在整理源文件...</div>';
+      organizeResults.style.display = 'block';
+
+      vscode.postMessage({ command: 'organizeSourceFile' });
+    }
+
+    // 整理目标文件
+    function organizeTargetFiles() {
+      const organizeTargetBtn = document.getElementById('organizeTargetBtn');
+      organizeTargetBtn.textContent = '整理中...';
+      organizeTargetBtn.disabled = true;
+
+      // 显示整理结果区域
+      const organizeResults = document.getElementById('organizeResults');
+      const organizeList = document.getElementById('organizeList');
+      organizeList.innerHTML = '<div class="loading"><div class="spinner"></div>正在整理目标文件...</div>';
+      organizeResults.style.display = 'block';
+
+      vscode.postMessage({ command: 'organizeTargetFiles' });
+    }
+
+    // 关闭整理结果
+    function closeOrganizeResults() {
+      const organizeResults = document.getElementById('organizeResults');
+      organizeResults.style.display = 'none';
+    }
+
+    // 监听扩展消息
+    window.addEventListener('message', event => {
+      const message = event.data;
+
+      switch (message.command) {
+        case 'fileInfoResult':
+          handleFileInfoResult(message);
+          break;
+        case 'organizeResult':
+          handleOrganizeResult(message);
+          break;
+      }
+    });
+
+    // 处理文件信息结果
+    function handleFileInfoResult(message) {
+      const fileInfo = document.getElementById('fileInfo');
+
+      if (!message.success) {
+        fileInfo.innerHTML = `<div class="error-result">❌ ${message.message}</div>`;
+        return;
+      }
+
+      const sourceFile = message.sourceFile || 'zh-CN.js';
+      const targetFiles = message.files || [];
+      const targetFileNames = targetFiles.map(f => f.name).join(', ');
+
+      fileInfo.innerHTML = `源文件: ${sourceFile}, 目标语言文件: ${targetFileNames}`;
+    }
+
+    // 处理整理结果
+    function handleOrganizeResult(message) {
+      const organizeList = document.getElementById('organizeList');
+      const organizeSourceBtn = document.getElementById('organizeSourceBtn');
+      const organizeTargetBtn = document.getElementById('organizeTargetBtn');
+
+      // 重置按钮状态
+      organizeSourceBtn.textContent = '整理源文件';
+      organizeSourceBtn.disabled = false;
+      organizeTargetBtn.textContent = '整理目标文件';
+      organizeTargetBtn.disabled = false;
+
+      if (!message.success) {
+        organizeList.innerHTML = `<div class="error-result">❌ ${message.message}</div>`;
+        return;
+      }
+
+      if (message.type === 'source') {
+        // 源文件整理结果
+        organizeList.innerHTML = `
+          <div class="success-result">
+            <div class="result-item">
+              <span class="status success">✅</span>
+              <span class="file-name">${message.file}</span>
+              <span class="message">${message.message}</span>
+            </div>
+          </div>
+        `;
+      } else if (message.type === 'target') {
+        // 目标文件整理结果
+        let html = '';
+        message.results.forEach(result => {
+          const statusClass = result.success ? 'success' : 'error';
+          const statusIcon = result.success ? '✅' : '❌';
+
+          html += `
+            <div class="result-item">
+              <span class="status ${statusClass}">${statusIcon}</span>
+              <span class="file-name">${result.file}</span>
+              <span class="message">${result.message}</span>
+            </div>
+          `;
+        });
+
+        organizeList.innerHTML = html;
+      }
+    }
+  </script>
+</body>
+
+</html>

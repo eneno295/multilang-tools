@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">文件配置</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background-color: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      color: var(--vscode-editor-foreground);
+      border-bottom: 2px solid var(--vscode-focusBorder);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: var(--vscode-foreground);
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--vscode-focusBorder);
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-group input {
+      flex: 1;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+
+    .btn-primary:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    .btn-secondary {
+      background-color: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .test-result {
+      margin-top: 5px;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 3px;
+    }
+
+    .test-success {
+      background-color: var(--vscode-debugIcon-startForeground);
+      color: white;
+    }
+
+    .test-error {
+      background-color: var(--vscode-errorForeground);
+      color: white;
+    }
+
+    .description {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+      margin-top: 4px;
+    }
+
+    .actions {
+      margin-top: 30px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+
+
+    .help-text {
+      background-color: var(--vscode-textBlockQuote-background);
+      border-left: 4px solid var(--vscode-focusBorder);
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+
+    .help-text h4 {
+      margin-top: 0;
+      color: var(--vscode-editor-foreground);
+    }
+
+    .help-text ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+
+    .help-text li {
+      margin: 8px 0;
+    }
+
+    .message {
+      padding: 10px 15px;
+      border-radius: 4px;
+      margin: 10px 0;
+      font-size: 14px;
+      display: none;
+    }
+
+    .message-success {
+      background-color: var(--vscode-debugIcon-startForeground);
+      color: white;
+    }
+
+    .message-error {
+      background-color: var(--vscode-errorForeground);
+      color: white;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2 id="mainTitle">文件配置</h2>
+
+    <div class="help-text">
+      <h4>配置说明</h4>
+      <ul id="descList"></ul>
+    </div>
+    <form id="configForm">
+      <div class="form-group">
+        <label id="dirLabel" for="dir">文件目录：</label>
+        <div class="input-group">
+          <input type="text" id="dir" value="" placeholder="">
+          <button type="button" class="btn btn-secondary btn-small" onclick="testPath('dir')">测试路径</button>
+        </div>
+        <div class="description" id="dirDesc"></div>
+        <div id="dirResult" class="test-result" style="display: none;"></div>
+      </div>
+      <div class="form-group">
+        <label id="sourceFileLabel" for="sourceFile">源文件：</label>
+        <div class="input-group">
+          <input type="text" id="sourceFile" value="" placeholder="">
+          <button type="button" class="btn btn-secondary btn-small" onclick="testPath('sourceFile')">测试路径</button>
+        </div>
+        <div class="description" id="sourceFileDesc"></div>
+        <div id="sourceFileResult" class="test-result" style="display: none;"></div>
+      </div>
+      <div class="form-group">
+        <label id="execFileLabel" for="execFile">执行文件：</label>
+        <div class="input-group">
+          <input type="text" id="execFile" value="" placeholder="">
+          <button type="button" class="btn btn-secondary btn-small" onclick="testPath('execFile')">测试路径</button>
+        </div>
+        <div class="description" id="execFileDesc"></div>
+        <div id="execFileResult" class="test-result" style="display: none;"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" id="resetBtn">重置</button>
+        <button type="button" class="btn btn-secondary" id="clearBtn">清空</button>
+        <button type="submit" class="btn btn-primary">保存配置</button>
+      </div>
+    </form>
+
+
+
+    <!-- 消息提示区域 -->
+    <div id="messageContainer" class="message"></div>
+  </div>
+  <script>
+    const vscode = acquireVsCodeApi();
+    let options = {};
+    window.addEventListener('message', event => {
+      const message = event.data;
+      if (message.command === 'setConfig') {
+        setFormValues(message.config);
+        if (message.options) {
+          options = message.options;
+          renderOptions(options);
+        }
+      }
+      switch (message.command) {
+        case 'testResult':
+          const fieldId = message.field || 'dir';
+          showTestResult(fieldId, message.success, message.message, message.extraInfo);
+          break;
+        case 'saveSuccess':
+          clearAllTestResults();
+          showMessage(message.message || '配置保存成功！', 'success');
+          break;
+      }
+    });
+    function renderOptions(opts) {
+      document.title = opts.title;
+      document.getElementById('mainTitle').textContent = opts.title;
+      document.getElementById('pageTitle').textContent = opts.title;
+      // 说明
+      const descUl = document.getElementById('descList');
+      descUl.innerHTML = '';
+      opts.descList.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = item;
+        descUl.appendChild(li);
+      });
+      // label/desc/placeholder
+      document.getElementById('dirLabel').textContent = opts.dirLabel;
+      document.getElementById('dir').placeholder = opts.dirPlaceholder;
+      document.getElementById('dirDesc').textContent = opts.dirDesc;
+      document.getElementById('sourceFileLabel').textContent = opts.sourceFileLabel;
+      document.getElementById('sourceFile').placeholder = opts.sourceFilePlaceholder;
+      document.getElementById('sourceFileDesc').textContent = opts.sourceFileDesc;
+      document.getElementById('execFileLabel').textContent = opts.execFileLabel;
+      document.getElementById('execFile').placeholder = opts.execFilePlaceholder;
+      document.getElementById('execFileDesc').textContent = opts.execFileDesc;
+    }
+    document.getElementById('configForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const config = {
+        dir: document.getElementById('dir').value,
+        sourceFile: document.getElementById('sourceFile').value,
+        execFile: document.getElementById('execFile').value
+      };
+      vscode.postMessage({ command: 'saveConfig', config });
+    });
+    function testPath(fieldId) {
+      const pathVal = document.getElementById(fieldId).value;
+      if (!pathVal) {
+        const errorMessage = fieldId === 'dir' ? '请输入路径' : '请输入文件名';
+        showTestResult(fieldId, false, errorMessage);
+        return;
+      }
+      vscode.postMessage({
+        command: 'testPath',
+        field: fieldId,
+        path: pathVal,
+        dir: document.getElementById('dir').value,
+        sourceFile: document.getElementById('sourceFile').value
+      });
+    }
+    function showTestResult(fieldId, success, message, extraInfo = '') {
+      const resultDiv = document.getElementById(fieldId + 'Result');
+      resultDiv.textContent = message;
+      resultDiv.className = 'test-result ' + (success ? 'test-success' : 'test-error');
+      resultDiv.style.display = 'block';
+    }
+
+    function clearAllTestResults() {
+      // 清除所有测试结果提示
+      const resultDivs = ['dirResult', 'sourceFileResult', 'execFileResult'];
+      resultDivs.forEach(id => {
+        const div = document.getElementById(id);
+        if (div) {
+          div.style.display = 'none';
+        }
+      });
+    }
+
+    function showMessage(message, type = 'success') {
+      const messageContainer = document.getElementById('messageContainer');
+      messageContainer.textContent = message;
+      messageContainer.className = `message message-${type}`;
+      messageContainer.style.display = 'block';
+
+      // 3秒后自动隐藏
+      setTimeout(() => {
+        messageContainer.style.display = 'none';
+      }, 3000);
+    }
+    document.getElementById('resetBtn').onclick = function () {
+      clearAllTestResults();
+      vscode.postMessage({ command: 'getConfig' });
+    };
+    document.getElementById('clearBtn').onclick = function () {
+      clearAllTestResults();
+      document.getElementById('dir').value = '';
+      document.getElementById('sourceFile').value = '';
+      document.getElementById('execFile').value = '';
+    };
+
+
+    function setFormValues(config) {
+      document.getElementById('dir').value = config.dir || '';
+      document.getElementById('sourceFile').value = config.sourceFile || '';
+      document.getElementById('execFile').value = config.execFile || '';
+    }
+  </script>
+</body>
+
+</html>

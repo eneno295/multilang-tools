@@ -1,0 +1,150 @@
+{
+  "name": "multilang-tools",
+  "displayName": "多语言开发工具",
+  "description": "VSCode 多语言开发辅助工具，支持错误码管理、批量翻译、文件整理等功能",
+  "version": "0.0.1",
+  "publisher": "your-publisher-name",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/multilang-tools.git"
+  },
+  "keywords": [
+    "multilang",
+    "translation",
+    "error-code",
+    "internationalization",
+    "i18n"
+  ],
+  "author": {
+    "name": "Your Name",
+    "email": "your-email@example.com"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "multilang-tools",
+          "title": "多语言工具",
+          "icon": "$(symbol-number)"
+        }
+      ]
+    },
+    "views": {
+      "multilang-tools": [
+        {
+          "id": "errorManager",
+          "name": "错误码管理工具",
+          "when": "true"
+        },
+        {
+          "id": "batchTranslateManager",
+          "name": "批量翻译工具",
+          "when": "true"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "batchTranslateManager",
+        "contents": "[文件路径配置](command:multilang-tools.batchConfigPath)\n[批量翻译](command:multilang-tools.batchTranslate)\n[整理文件](command:multilang-tools.batchOrganizeFile)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "multilang-tools.configPath",
+        "title": "文件路径配置",
+        "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.addSourceFile",
+        "title": "添加错误码",
+        "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.translateFile",
+        "title": "批量翻译",
+        "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.organizeFile",
+        "title": "整理文件",
+        "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.batchConfigPath",
+        "title": "文件路径配置",
+        "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.batchTranslate",
+        "title": "批量翻译",
+        "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.batchOrganizeFile",
+        "title": "整理文件",
+        "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.refreshNumberCodeFiles",
+        "title": "刷新错误码文件",
+        "category": "多语言工具"
+      }
+    ],
+    "configuration": {
+      "title": "多语言工具配置",
+      "properties": {
+        "multilang-tools.errorCodePath": {
+          "type": "string",
+          "default": "public/errCode",
+          "description": "错误码文件目录路径"
+        },
+        "multilang-tools.errorCodeSourceFile": {
+          "type": "string",
+          "default": "zh-CN.js",
+          "description": "错误码源文件名"
+        },
+        "multilang-tools.errorCodeExecFile": {
+          "type": "string",
+          "default": "all",
+          "description": "错误码执行文件名"
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "multilang-tools.refreshNumberCodeFiles",
+          "when": "view == errorManager",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./ && npm run copy-templates",
+    "copy-templates": "cp -r src/templates out/",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "16.x",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@types/node-fetch": "^2.6.13",
+    "node-fetch": "^2.7.0"
+  }
+}

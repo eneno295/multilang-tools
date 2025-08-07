@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>添加错误码</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background-color: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* 标题样式 */
+    h2 {
+      color: var(--vscode-editor-foreground);
+      border-bottom: 2px solid var(--vscode-focusBorder);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    /* 说明区域样式 */
+    .description {
+      background-color: var(--vscode-textBlockQuote-background);
+      border-left: 4px solid var(--vscode-focusBorder);
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+
+    /* 表单组样式 */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: var(--vscode-editor-foreground);
+    }
+
+    /* 文本域样式 */
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      max-height: 200px;
+      padding: 15px;
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 14px;
+      resize: vertical;
+      margin: 0;
+      box-sizing: border-box;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--vscode-focusBorder);
+    }
+
+    /* 示例区域样式 */
+    .example {
+      background-color: var(--vscode-textCodeBlock-background);
+      border: 1px solid var(--vscode-textCodeBlock-border);
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 20px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+    }
+
+    /* 按钮组样式 */
+    .buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .btn-primary {
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+
+    .btn-primary:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    .btn-secondary {
+      background-color: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    /* 错误信息样式 */
+    .error {
+      color: var(--vscode-errorForeground);
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    /* 结果显示区域样式 */
+    .result-message {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 6px;
+      background-color: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .result-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .result-stats {
+      margin-bottom: 10px;
+    }
+
+    .result-stats div {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+
+    .result-details {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    /* 状态颜色样式 */
+    .success {
+      color: var(--vscode-notificationsInfoIcon-foreground);
+    }
+
+    .warning {
+      color: var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    .error-result {
+      color: var(--vscode-errorForeground);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>添加错误码</h2>
+
+    <!-- 使用说明区域 -->
+    <div class="description">
+      <strong>使用说明：</strong>
+      <ul>
+        <li>在下面的文本框中输入新的错误码，每行一个</li>
+        <li>格式：<code>"错误码": "错误消息"</code></li>
+        <li>错误码必须是数字，错误消息用双引号包围</li>
+        <li>错误码会自动按照数字排序</li>
+        <li>点击"添加错误码"按钮将错误码添加到源文件中</li>
+      </ul>
+    </div>
+
+    <!-- 示例格式区域 -->
+    <div class="example">
+      <strong>示例格式：</strong><br>
+      "0000":"测试0000"<br>
+      "0002":"{0}带变量名的{1}"<br>
+      "1015003001":"测试最后一行"<br>
+    </div>
+
+    <!-- 输入表单区域 -->
+    <div class="form-group">
+      <label for="errorCodes">错误码列表：</label>
+      <textarea id="errorCodes" placeholder='请输入错误码，格式如：
+"0000":"测试0000"
+"0002":"{0}带变量名的{1}"
+"1015003001":"测试最后一行"'></textarea>
+      <div id="errorMessage" class="error" style="display: none;"></div>
+    </div>
+
+    <!-- 操作按钮区域 -->
+    <div class="buttons">
+      <button class="btn-secondary" onclick="clearText()">清空</button>
+      <button class="btn-primary" onclick="errorCodeAdd()">添加错误码</button>
+    </div>
+
+    <!-- 结果显示区域 -->
+    <div id="resultMessage" class="result-message" style="display: none;">
+      <div id="resultTitle" class="result-title"></div>
+      <div id="resultStats" class="result-stats"></div>
+      <div id="resultDetails" class="result-details"></div>
+    </div>
+  </div>
+
+  <script>
+    // 获取VSCode API
+    const vscode = acquireVsCodeApi();
+
+    /**
+     * 添加错误码的主要函数
+     * 解析用户输入的错误码并发送到扩展
+     */
+    function errorCodeAdd() {
+      const textarea = document.getElementById('errorCodes');
+      const content = textarea.value.trim();
+
+      // 检查是否有输入内容
+      if (!content) {
+        showError('请输入错误码');
+        return;
+      }
+
+      // 按行分割并过滤空行
+      const lines = content.split('\n').filter(line => line.trim());
+      const errorCodes = [];
+      let hasError = false;
+
+      // 逐行解析错误码
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // 解析错误码
+        const result = parseErrorCode(line);
+        if (!result.isValid) {
+          showError(`第 ${i + 1} 行格式错误: "${line}"`);
+          hasError = true;
+          break;
+        }
+
+        errorCodes.push({
+          code: result.code,
+          message: result.message
+        });
+      }
+
+      // 如果没有错误，发送到扩展处理
+      if (!hasError) {
+        hideError();
+        vscode.postMessage({
+          command: 'errorCodeAdd',
+          errorCodes: errorCodes
+        });
+      }
+    }
+
+    /**
+     * 解析单行错误码
+     * @param {string} line - 要解析的行
+     * @returns {object} 解析结果，包含isValid、code、message
+     */
+    function parseErrorCode(line) {
+      // 检查基本格式：以双引号开始且包含'":"'
+      if (!line.startsWith('"') || !line.includes('":"')) {
+        return { isValid: false };
+      }
+
+      // 找到分隔符位置
+      const firstQuoteIndex = line.indexOf('":"');
+      if (firstQuoteIndex <= 0) {
+        return { isValid: false };
+      }
+
+      // 提取错误码和消息部分
+      const codePart = line.substring(1, firstQuoteIndex);
+      const messagePart = line.substring(firstQuoteIndex + 3);
+
+      // 验证错误码是否为数字，消息是否以双引号结束
+      if (!isNumeric(codePart) || !messagePart.endsWith('"')) {
+        return { isValid: false };
+      }
+
+      return {
+        isValid: true,
+        code: codePart,
+        message: messagePart.slice(0, -1) // 去掉结尾的双引号
+      };
+    }
+
+    /**
+     * 检查字符串是否为数字
+     * @param {string} str - 要检查的字符串
+     * @returns {boolean} 是否为数字
+     */
+    function isNumeric(str) {
+      return !isNaN(str) && str.trim() !== '';
+    }
+
+    /**
+     * 清空文本框和错误信息
+     */
+    function clearText() {
+      document.getElementById('errorCodes').value = '';
+      hideError();
+    }
+
+    /**
+     * 显示错误信息
+     * @param {string} message - 错误消息
+     */
+    function showError(message) {
+      const errorElement = document.getElementById('errorMessage');
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+
+    /**
+     * 隐藏错误信息
+     */
+    function hideError() {
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    /**
+     * 显示处理结果
+     * @param {object} result - 处理结果对象
+     */
+    function showResult(result) {
+      const resultMessage = document.getElementById('resultMessage');
+      const resultTitle = document.getElementById('resultTitle');
+      const resultStats = document.getElementById('resultStats');
+      const resultDetails = document.getElementById('resultDetails');
+
+      // 设置标题和样式
+      resultTitle.textContent = result.message;
+      resultTitle.className = 'result-title ' + (result.success ? 'success' : 'error-result');
+
+      // 设置统计信息
+      const stats = result.stats;
+      resultStats.innerHTML = `
+                <div class="success">✅ 新添加: ${stats.added} 个</div>
+                <div class="warning">ℹ️ 已存在: ${stats.exists} 个</div>
+                <div class="error-result">❌ 失败: ${stats.failed} 个</div>
+            `;
+
+      // 设置详细信息
+      if (result.details) {
+        let detailsHtml = '';
+
+        // 新添加的错误码
+        if (result.details.added && result.details.added.length > 0) {
+          detailsHtml += '<div><strong>新添加的错误码：</strong></div>';
+          result.details.added.forEach(item => {
+            const lineInfo = item.lineNumber ? ` (第${item.lineNumber}行)` : '';
+            detailsHtml += `<div>• "${item.code}": "${item.message}"${lineInfo}</div>`;
+          });
+        }
+
+        // 已存在的错误码
+        if (result.details.exists && result.details.exists.length > 0) {
+          detailsHtml += '<div><strong>已存在的错误码：</strong></div>';
+          result.details.exists.forEach(item => {
+            detailsHtml += `<div>• "${item.code}": "${item.message}"</div>`;
+          });
+        }
+
+        // 失败的错误码
+        if (result.details.failed && result.details.failed.length > 0) {
+          detailsHtml += '<div><strong>失败的错误码：</strong></div>';
+          result.details.failed.forEach(item => {
+            detailsHtml += `<div>• "${item.code}": "${item.message}"</div>`;
+          });
+        }
+
+        resultDetails.innerHTML = detailsHtml;
+      } else {
+        resultDetails.innerHTML = '';
+      }
+
+      // 显示结果区域
+      resultMessage.style.display = 'block';
+      hideError();
+    }
+
+    // 监听回车键（Ctrl+Enter 快速提交）
+    document.getElementById('errorCodes').addEventListener('keydown', function (e) {
+      if (e.ctrlKey && e.key === 'Enter') {
+        errorCodeAdd();
+      }
+    });
+
+    // 监听扩展消息，添加成功后自动跳转批量翻译
+    window.addEventListener('message', event => {
+      const message = event.data;
+      switch (message.command) {
+        case 'showResult':
+          showResult(message.result);
+          break;
+      }
+    });
+  </script>
+</body>
+
+</html>
