@@ -136,7 +136,9 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./ && npm run copy-templates",
     "copy-templates": "cp -r src/templates out/",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
   },
   "devDependencies": {
     "@types/node": "16.x",
