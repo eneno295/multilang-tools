@@ -86,9 +86,13 @@ export class FileConfigCommand {
 
   private getWebviewContent(): string {
     try {
-      // 从 out/templates 目录读取模板文件
-      const currentFilePath = __dirname;
-      const templatePath = path.join(currentFilePath, '..', 'templates', 'fileConfig.html');
+      // 使用扩展的根目录来定位模板文件
+      const extensionPath = vscode.extensions.getExtension('lande.multilang-tools')?.extensionPath;
+      if (!extensionPath) {
+        throw new Error('无法获取扩展路径');
+      }
+
+      const templatePath = path.join(extensionPath, 'out', 'templates', 'fileConfig.html');
 
       if (!fs.existsSync(templatePath)) {
         throw new Error(`模板文件不存在: ${templatePath}`);

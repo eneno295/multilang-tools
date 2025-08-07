@@ -2,11 +2,11 @@
   "name": "multilang-tools",
   "displayName": "多语言开发工具",
   "description": "VSCode 多语言开发辅助工具，支持错误码管理、批量翻译、文件整理等功能",
-  "version": "0.0.1",
-  "publisher": "your-publisher-name",
+  "version": "0.0.9",
+  "publisher": "lande",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/multilang-tools.git"
+    "url": "https://github.com/eneno295/multilang-tools.git"
   },
   "keywords": [
     "multilang",
@@ -16,8 +16,8 @@
     "i18n"
   ],
   "author": {
-    "name": "Your Name",
-    "email": "your-email@example.com"
+    "name": "lanlan",
+    "email": "biewen@example.com"
   },
   "license": "MIT",
   "engines": {

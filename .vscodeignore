@@ -8,4 +8,7 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
-node_modules/** 
+node_modules/**
+!node_modules/node-fetch/**
+!node_modules/@types/node-fetch/**
+!node_modules/whatwg-url/** 
