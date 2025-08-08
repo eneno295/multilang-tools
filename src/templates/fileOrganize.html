@@ -205,6 +205,112 @@
       padding: 10px;
       margin: 10px 0;
     }
+
+    .source-info {
+      background: var(--vscode-panel-background);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .source-info h3 {
+      margin: 0 0 10px 0;
+      color: var(--vscode-focusBorder);
+    }
+
+    .source-info .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .source-info .info-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .source-info .info-label {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 4px;
+    }
+
+    .source-info .info-value {
+      font-weight: bold;
+      color: var(--vscode-foreground);
+    }
+
+    .result-card {
+      background: var(--vscode-panel-background);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .result-card .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .result-card .file-name {
+      font-weight: bold;
+      color: var(--vscode-foreground);
+    }
+
+    .result-card .status {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .result-card .status.success {
+      color: #28a745;
+    }
+
+    .result-card .status.error {
+      color: var(--vscode-errorForeground);
+    }
+
+    .result-card .status-icon {
+      margin-right: 6px;
+      font-size: 16px;
+    }
+
+    .result-card .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .result-card .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .result-card .stat-label {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 4px;
+    }
+
+    .result-card .stat-value {
+      font-weight: bold;
+      color: var(--vscode-foreground);
+    }
+
+    .result-card .stat-value.missing {
+      color: var(--vscode-errorForeground);
+    }
+
+    .result-card .stat-value.redundant {
+      color: #ffa500;
+    }
   </style>
 </head>
 
@@ -238,6 +344,27 @@
         <h3 id="organizeTitle">整理结果:</h3>
         <button class="close-btn" onclick="closeOrganizeResults()" title="关闭">×</button>
       </div>
+
+      <!-- 源文件信息 -->
+      <div class="source-info" id="sourceInfo" style="display: none;">
+        <h3>源文件信息</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">源文件</div>
+            <div class="info-value" id="sourceFileName">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">总行数</div>
+            <div class="info-value" id="sourceTotalLines">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">总键数</div>
+            <div class="info-value" id="sourceTotalKeys">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 整理结果 -->
       <div id="organizeList">
       </div>
     </div>
@@ -327,6 +454,7 @@
       const organizeList = document.getElementById('organizeList');
       const organizeSourceBtn = document.getElementById('organizeSourceBtn');
       const organizeTargetBtn = document.getElementById('organizeTargetBtn');
+      const sourceInfo = document.getElementById('sourceInfo');
 
       // 重置按钮状态
       organizeSourceBtn.textContent = '整理源文件';
@@ -341,6 +469,7 @@
 
       if (message.type === 'source') {
         // 源文件整理结果
+        sourceInfo.style.display = 'none';
         organizeList.innerHTML = `
           <div class="success-result">
             <div class="result-item">
@@ -351,19 +480,71 @@
           </div>
         `;
       } else if (message.type === 'target') {
+        // 显示源文件信息
+        if (message.sourceInfo) {
+          document.getElementById('sourceFileName').textContent = message.sourceInfo.file;
+          document.getElementById('sourceTotalLines').textContent = message.sourceInfo.lines;
+          document.getElementById('sourceTotalKeys').textContent = message.sourceInfo.keys;
+          sourceInfo.style.display = 'block';
+        }
+
         // 目标文件整理结果
         let html = '';
         message.results.forEach(result => {
-          const statusClass = result.success ? 'success' : 'error';
-          const statusIcon = result.success ? '✅' : '❌';
-
-          html += `
-            <div class="result-item">
-              <span class="status ${statusClass}">${statusIcon}</span>
-              <span class="file-name">${result.file}</span>
-              <span class="message">${result.message}</span>
-            </div>
-          `;
+          if (result.success) {
+            html += `
+              <div class="result-card">
+                <div class="card-header">
+                  <div class="file-name">${result.file}</div>
+                  <div class="status success">
+                    <span class="status-icon">✅</span>
+                    成功
+                  </div>
+                </div>
+                <div class="stats-grid">
+                  <div class="stat-item">
+                    <div class="stat-label">原始行数</div>
+                    <div class="stat-value">${result.originalLines || 0}</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-label">整理后行数</div>
+                    <div class="stat-value">${result.organizedLines || 0} (${(result.organizedLines || 0) - (result.originalLines || 0)})</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-label">原始键数</div>
+                    <div class="stat-value">${result.originalKeys || 0}</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-label">整理后键数</div>
+                    <div class="stat-value">${result.organizedKeys || 0}</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-label">缺失键数</div>
+                    <div class="stat-value missing">${result.missingKeys || 0}</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-label">多余键数</div>
+                    <div class="stat-value redundant">${result.redundantKeys || 0}</div>
+                  </div>
+                </div>
+              </div>
+            `;
+          } else {
+            html += `
+              <div class="result-card">
+                <div class="card-header">
+                  <div class="file-name">${result.file}</div>
+                  <div class="status error">
+                    <span class="status-icon">❌</span>
+                    失败
+                  </div>
+                </div>
+                <div style="color: var(--vscode-errorForeground); margin-top: 10px;">
+                  ${result.message}
+                </div>
+              </div>
+            `;
+          }
         });
 
         organizeList.innerHTML = html;

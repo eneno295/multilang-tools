@@ -179,8 +179,24 @@ export class FileOrganizeCommand {
       }
 
       const sourceDir = path.join(workspaceRoot, dirPath);
+      const sourceFilePath = path.join(sourceDir, sourceFile);
+
+      // 获取源文件信息
+      const sourceContent = fs.readFileSync(sourceFilePath, 'utf8');
+      const sourceInfo = this.getFileInfo(sourceContent);
+
       const targetFiles = this.getTargetFiles(sourceDir, sourceFile, execFile);
-      const results: Array<{ file: string, success: boolean, message: string }> = [];
+      const results: Array<{
+        file: string,
+        success: boolean,
+        message: string,
+        originalLines?: number,
+        organizedLines?: number,
+        originalKeys?: number,
+        organizedKeys?: number,
+        missingKeys?: number,
+        redundantKeys?: number
+      }> = [];
 
       for (const targetFile of targetFiles) {
         try {
@@ -193,13 +209,17 @@ export class FileOrganizeCommand {
             continue;
           }
 
-          // 读取源文件内容作为参考
-          const sourceFilePath = path.join(sourceDir, sourceFile);
-          const sourceContent = fs.readFileSync(sourceFilePath, 'utf8');
-
           // 读取目标文件内容
           const content = fs.readFileSync(targetFile.path, 'utf8');
+          const originalInfo = this.getFileInfo(content);
+
+          // 整理文件
           const organizedContent = this.organizeFileContent(content, sourceContent);
+          const organizedInfo = this.getFileInfo(organizedContent);
+
+          // 计算缺失和多余的键
+          const missingKeys = this.calculateMissingKeys(sourceInfo.keys, organizedInfo.keys);
+          const redundantKeys = this.calculateRedundantKeys(sourceInfo.keys, organizedInfo.keys);
 
           // 写回文件
           fs.writeFileSync(targetFile.path, organizedContent, 'utf8');
@@ -207,7 +227,13 @@ export class FileOrganizeCommand {
           results.push({
             file: targetFile.name,
             success: true,
-            message: `整理完成`
+            message: `整理完成`,
+            originalLines: originalInfo.lines,
+            organizedLines: organizedInfo.lines,
+            originalKeys: originalInfo.keys.length,
+            organizedKeys: organizedInfo.keys.length,
+            missingKeys: missingKeys,
+            redundantKeys: redundantKeys
           });
         } catch (error) {
           results.push({
@@ -222,6 +248,11 @@ export class FileOrganizeCommand {
         command: 'organizeResult',
         success: true,
         message: `目标文件整理完成`,
+        sourceInfo: {
+          file: sourceFile,
+          lines: sourceInfo.lines,
+          keys: sourceInfo.keys.length
+        },
         results: results,
         type: 'target'
       });
@@ -638,5 +669,31 @@ export class FileOrganizeCommand {
     }
 
     return result.join('\n');
+  }
+
+  private getFileInfo(content: string): { lines: number, keys: string[] } {
+    const lines = content.split('\n');
+    const keys: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const match = trimmed.match(/^["']([^"']+)["']\s*:\s*["']/);
+      if (match) {
+        keys.push(match[1]);
+      }
+    }
+
+    return {
+      lines: lines.length,
+      keys: keys
+    };
+  }
+
+  private calculateMissingKeys(sourceKeys: string[], targetKeys: string[]): number {
+    return sourceKeys.filter(key => !targetKeys.includes(key)).length;
+  }
+
+  private calculateRedundantKeys(sourceKeys: string[], targetKeys: string[]): number {
+    return targetKeys.filter(key => !sourceKeys.includes(key)).length;
   }
 } 
