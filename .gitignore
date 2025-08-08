@@ -106,3 +106,4 @@ temp/
 # Test files
 /cypress/videos/
 /cypress/screenshots/
+zh-CN.js

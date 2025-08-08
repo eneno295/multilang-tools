@@ -2,7 +2,8 @@
   "name": "multilang-tools",
   "displayName": "多语言开发工具",
   "description": "VSCode 多语言开发辅助工具，支持错误码管理、批量翻译、文件整理等功能",
-  "version": "0.0.9",
+  "version": "0.1.2",
+  "icon": "icon.png",
   "publisher": "lande",
   "repository": {
     "type": "git",
@@ -36,7 +37,7 @@
         {
           "id": "multilang-tools",
           "title": "多语言工具",
-          "icon": "$(symbol-number)"
+          "icon": "$(globe)"
         }
       ]
     },
@@ -145,8 +146,5 @@
     "@types/vscode": "^1.74.0",
     "typescript": "^5.0.0"
   },
-  "dependencies": {
-    "@types/node-fetch": "^2.6.13",
-    "node-fetch": "^2.7.0"
-  }
+  "dependencies": {}
 }

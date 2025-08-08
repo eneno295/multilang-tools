@@ -148,7 +148,7 @@ export class FileOrganizeCommand {
       panel.webview.postMessage({
         command: 'organizeResult',
         success: true,
-        message: `源文件 ${sourceFile} 整理完成`,
+        message: `源文件整理完成`,
         file: sourceFile,
         type: 'source'
       });
@@ -263,142 +263,380 @@ export class FileOrganizeCommand {
   }
 
   private organizeSourceFile(content: string): string {
-    // 按行拆分
     const lines = content.split('\n');
 
-    // 按模块分组处理
-    const sections: Array<{
-      moduleComment?: string,
-      errorCodes: Array<{ code: string, line: string }>,
-      otherLines: string[]
-    }> = [];
+    // 1. 解析文件结构，识别所有模块和错误码
+    const { sections, allErrorCodes } = this.parseSectionsAndCodes(lines);
 
-    let currentSection = {
-      errorCodes: [] as Array<{ code: string, line: string }>,
-      otherLines: [] as string[]
-    };
+    // 2. 基于错误码语义分析，识别模块规则
+    const { moduleRules, misplacedCodes } = this.semanticAnalyzeErrorCodeDistribution(sections, allErrorCodes);
+
+    // 3. 重新分配错误码到正确的模块
+    const reorganizedSections = this.reorganizeErrorCodes(sections, moduleRules, misplacedCodes);
+
+    // 4. 对每个模块内的错误码进行排序
+    this.sortSections(reorganizedSections);
+
+    // 5. 重建文件
+    return this.rebuildFile(reorganizedSections);
+  }
+
+  private parseSectionsAndCodes(lines: string[]): { sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>, allErrorCodes: Array<{ code: string, line: string, section: string }> } {
+    const sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }> = [];
+    const allErrorCodes: Array<{ code: string, line: string, section: string }> = [];
+    let currentSection: string | null = null;
+    let currentErrorCodes: Array<{ code: string, line: string }> = [];
+    let endBracket: string | null = null;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const trimmedLine = line.trim();
+      const trimmed = line.trim();
 
-      // 检查是否是模块注释
-      if (trimmedLine.startsWith('//') && (trimmedLine.includes('模块') || trimmedLine.includes('-'))) {
-        // 保存当前section
-        if (currentSection.errorCodes.length > 0 || currentSection.otherLines.length > 0) {
-          sections.push({ ...currentSection });
-        }
-        // 开始新section
-        currentSection = {
-          errorCodes: [],
-          otherLines: [line] // 模块注释作为otherLines
-        };
-      } else {
-        // 检查是否是错误码行
-        const match = trimmedLine.match(/['"`]([^'"`]+)['"`]\s*:\s*['"`]/);
-        if (match) {
-          currentSection.errorCodes.push({
-            code: match[1],
-            line: line
+      // 检查是否是结尾括号
+      if (trimmed === '}') {
+        endBracket = line;
+        continue;
+      }
+
+      // 检查是否是注释行（新的分组）
+      if (trimmed.startsWith('//') && (trimmed.includes('模块') || trimmed.includes('报错'))) {
+        // 保存前一个分组
+        if (currentSection) {
+          sections.push({
+            comment: currentSection,
+            errorCodes: currentErrorCodes
           });
-        } else {
-          currentSection.otherLines.push(line);
+        }
+
+        // 开始新分组
+        currentSection = line;
+        currentErrorCodes = [];
+        continue;
+      }
+
+      // 检查是否是错误码行
+      const match = trimmed.match(/^["'](\d+)["']\s*:\s*["']/);
+      if (match && currentSection) {
+        const errorCode = {
+          code: match[1],
+          line: line,
+          section: currentSection
+        };
+        currentErrorCodes.push({ code: match[1], line: line });
+        allErrorCodes.push(errorCode);
+        continue;
+      }
+
+      // 其他行（如 const errCode = {）
+      if (!currentSection) {
+        sections.push({
+          comment: line,
+          errorCodes: []
+        });
+      }
+    }
+
+    // 保存最后一个分组
+    if (currentSection) {
+      sections.push({
+        comment: currentSection,
+        errorCodes: currentErrorCodes
+      });
+    }
+
+    // 保存结尾括号
+    if (endBracket) {
+      sections.push({
+        comment: endBracket,
+        errorCodes: []
+      });
+    }
+
+    return { sections, allErrorCodes };
+  }
+
+  private semanticAnalyzeErrorCodeDistribution(sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>, allErrorCodes: Array<{ code: string, line: string, section: string }>): { moduleRules: { [key: string]: string[] }, misplacedCodes: Array<{ code: string, line: string, currentSection: string, shouldBeIn: string }> } {
+    // 基于语义分析错误码分布
+    const moduleRules: { [key: string]: string[] } = {};
+    const misplacedCodes: Array<{ code: string, line: string, currentSection: string, shouldBeIn: string }> = [];
+
+    // 第一步：分析每个模块中错误码的前缀模式，但排除明显错误分配的错误码
+    for (const section of sections) {
+      if (section.errorCodes.length === 0) continue;
+
+      const sectionName = section.comment;
+      const codes = section.errorCodes.map(ec => ec.code);
+
+      // 分析这个模块中错误码的前缀模式
+      const prefixes = this.analyzePrefixPattern(codes);
+
+      if (prefixes.length > 0) {
+        moduleRules[sectionName] = prefixes;
+      }
+    }
+
+    // 第二步：基于语义规则识别每个模块的主要前缀
+    const semanticRules = this.identifySemanticRules(sections, moduleRules);
+
+    // 第三步：检查每个错误码是否在正确的模块中
+    for (const section of sections) {
+      if (section.errorCodes.length === 0) continue;
+
+      const sectionName = section.comment;
+
+      for (const errorCode of section.errorCodes) {
+        const code = errorCode.code;
+        const correctModule = this.findCorrectModuleBySemantic(code, semanticRules);
+
+        if (correctModule && correctModule !== sectionName) {
+          misplacedCodes.push({
+            ...errorCode,
+            currentSection: sectionName,
+            shouldBeIn: correctModule
+          });
         }
       }
     }
 
-    // 添加最后一个section
-    if (currentSection.errorCodes.length > 0 || currentSection.otherLines.length > 0) {
-      sections.push(currentSection);
+    return { moduleRules: semanticRules, misplacedCodes };
+  }
+
+  private analyzePrefixPattern(codes: string[]): string[] {
+    // 分析错误码的前缀模式
+    const prefixes = new Set<string>();
+
+    for (const code of codes) {
+      // 提取前缀（前4位数字）
+      if (code.length >= 4) {
+        const prefix = code.substring(0, 4);
+        prefixes.add(prefix);
+      }
+      // 也考虑更短的前缀（前2位数字）
+      if (code.length >= 2) {
+        const shortPrefix = code.substring(0, 2);
+        prefixes.add(shortPrefix);
+      }
     }
 
-    // 重新构建文件内容
-    let organizedContent = '';
+    return Array.from(prefixes);
+  }
+
+  private identifySemanticRules(sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>, moduleRules: { [key: string]: string[] }): { [key: string]: string[] } {
+    // 基于语义规则识别模块前缀
+    const semanticRules: { [key: string]: string[] } = {};
 
     for (const section of sections) {
-      // 先输出非错误码行（包括模块注释）
-      for (const line of section.otherLines) {
-        organizedContent += line + '\n';
-      }
+      if (section.errorCodes.length === 0) continue;
 
-      // 对当前模块的错误码排序
-      if (section.errorCodes.length > 0) {
-        section.errorCodes.sort((a, b) => {
-          // 如果错误码是纯数字，按数值排序
-          const aNum = parseInt(a.code);
-          const bNum = parseInt(b.code);
-          if (!isNaN(aNum) && !isNaN(bNum)) {
-            return aNum - bNum;
-          }
-          // 否则按字符串排序
-          return a.code.localeCompare(b.code);
-        });
+      const sectionName = section.comment;
+      const codes = section.errorCodes.map(ec => ec.code);
 
-        // 输出排序后的错误码
-        for (const errorCode of section.errorCodes) {
-          organizedContent += errorCode.line + '\n';
+      // 基于模块名称和错误码分布识别语义规则
+      if (sectionName.includes('验证码') || sectionName.includes('报错')) {
+        // 验证码模块：通常包含 0000, 0001, 6202, 6204, 6205, 6206 等
+        const verificationPrefixes = codes.filter(code =>
+          code.startsWith('000') || code.startsWith('620')
+        ).map(code => code.substring(0, Math.min(4, code.length)));
+
+        if (verificationPrefixes.length > 0) {
+          semanticRules[sectionName] = [...new Set(verificationPrefixes)];
+        }
+      } else if (sectionName.includes('系统')) {
+        // 系统模块：通常包含 1002 开头的错误码
+        semanticRules[sectionName] = ['1002'];
+      } else if (sectionName.includes('会员')) {
+        // 会员模块：通常包含 1003 开头的错误码
+        semanticRules[sectionName] = ['1003'];
+      } else if (sectionName.includes('运营')) {
+        // 运营模块：通常包含 1005 开头的错误码
+        semanticRules[sectionName] = ['1005'];
+      } else if (sectionName.includes('信息')) {
+        // 信息模块：通常包含 1006 开头的错误码
+        semanticRules[sectionName] = ['1006'];
+      } else {
+        // 其他模块：基于现有分布
+        const prefixes = this.analyzePrefixPattern(codes);
+        if (prefixes.length > 0) {
+          semanticRules[sectionName] = prefixes.filter(p => p.length === 4);
         }
       }
     }
 
-    return organizedContent;
+    return semanticRules;
+  }
+
+  private findCorrectModuleBySemantic(code: string, semanticRules: { [key: string]: string[] }): string | null {
+    // 根据错误码前缀找到应该属于的模块
+    for (const [sectionName, prefixes] of Object.entries(semanticRules)) {
+      for (const prefix of prefixes) {
+        if (code.startsWith(prefix)) {
+          return sectionName;
+        }
+      }
+    }
+    return null;
+  }
+
+  private reorganizeErrorCodes(sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>, moduleRules: { [key: string]: string[] }, misplacedCodes: Array<{ code: string, line: string, currentSection: string, shouldBeIn: string }>): Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }> {
+    // 重新组织错误码，将错误分配的错误码移动到正确的模块
+    const reorganizedSections = sections.map(section => ({
+      ...section,
+      errorCodes: [...section.errorCodes]
+    }));
+
+    for (const misplacedCode of misplacedCodes) {
+      const correctSection = misplacedCode.shouldBeIn;
+      if (correctSection) {
+        // 从当前模块移除
+        const currentSection = reorganizedSections.find(s => s.comment === misplacedCode.currentSection);
+        if (currentSection) {
+          currentSection.errorCodes = currentSection.errorCodes.filter(ec => ec.code !== misplacedCode.code);
+        }
+
+        // 添加到正确模块
+        const targetSection = reorganizedSections.find(s => s.comment === correctSection);
+        if (targetSection) {
+          targetSection.errorCodes.push({
+            code: misplacedCode.code,
+            line: misplacedCode.line
+          });
+        }
+      }
+    }
+
+    return reorganizedSections;
+  }
+
+  private sortSections(sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>): void {
+    for (const section of sections) {
+      if (section.errorCodes.length > 0) {
+        section.errorCodes.sort((a, b) => parseInt(a.code) - parseInt(b.code));
+      }
+    }
+  }
+
+  private rebuildFile(sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>): string {
+    const result: string[] = [];
+
+    for (const section of sections) {
+      result.push(section.comment);
+
+      for (const errorCode of section.errorCodes) {
+        result.push(errorCode.line);
+      }
+    }
+
+    return result.join('\n');
   }
 
   private organizeTargetFile(content: string, sourceContent: string): string {
-    // 解析源文件，获取错误码顺序
-    const sourceLines = sourceContent.split('\n');
-    const sourceErrorCodes: string[] = [];
+    // 1. 先对源文件进行智能整理，获取正确的模块结构
+    const organizedSource = this.organizeSourceFile(sourceContent);
 
-    for (const line of sourceLines) {
-      const trimmedLine = line.trim();
-      const match = trimmedLine.match(/['"`]([^'"`]+)['"`]\s*:\s*['"`]/);
-      if (match) {
-        sourceErrorCodes.push(match[1]);
+    // 2. 解析整理后的源文件结构
+    const sourceSections = this.parseSections(organizedSource.split('\n'));
+
+    // 3. 解析目标文件
+    const targetSections = this.parseSections(content.split('\n'));
+
+    // 4. 按源文件的模块结构重新组织目标文件
+    return this.rebuildTargetFile(sourceSections, targetSections);
+  }
+
+  private parseSections(lines: string[]): Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }> {
+    const sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }> = [];
+    let currentSection: string | null = null;
+    let currentErrorCodes: Array<{ code: string, line: string }> = [];
+    let endBracket: string | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // 检查是否是结尾括号
+      if (trimmed === '}') {
+        endBracket = line;
+        continue;
+      }
+
+      // 检查是否是注释行（新的分组）
+      if (trimmed.startsWith('//') && (trimmed.includes('模块') || trimmed.includes('报错') || trimmed.includes('活动'))) {
+        // 保存前一个分组
+        if (currentSection) {
+          sections.push({
+            comment: currentSection,
+            errorCodes: currentErrorCodes
+          });
+        }
+
+        // 开始新分组
+        currentSection = line;
+        currentErrorCodes = [];
+        continue;
+      }
+
+      // 检查是否是错误码行
+      const match = trimmed.match(/^["'](\d+)["']\s*:\s*["']/);
+      if (match && currentSection) {
+        currentErrorCodes.push({
+          code: match[1],
+          line: line
+        });
+        continue;
+      }
+
+      // 其他行（如 const errCode = {）
+      if (!currentSection) {
+        sections.push({
+          comment: line,
+          errorCodes: []
+        });
       }
     }
 
-    // 解析目标文件
-    const targetLines = content.split('\n');
-    const targetErrorCodes = new Map<string, string>(); // code -> line
-    const nonErrorCodeLines: string[] = [];
+    // 保存最后一个分组
+    if (currentSection) {
+      sections.push({
+        comment: currentSection,
+        errorCodes: currentErrorCodes
+      });
+    }
 
-    for (const line of targetLines) {
-      const trimmedLine = line.trim();
-      const match = trimmedLine.match(/['"`]([^'"`]+)['"`]\s*:\s*['"`]/);
-      if (match) {
-        targetErrorCodes.set(match[1], line);
-      } else {
-        nonErrorCodeLines.push(line);
+    // 保存结尾括号
+    if (endBracket) {
+      sections.push({
+        comment: endBracket,
+        errorCodes: []
+      });
+    }
+
+    return sections;
+  }
+
+  private rebuildTargetFile(sourceSections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>, targetSections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>): string {
+    // 创建目标文件错误码映射
+    const targetErrorCodes = new Map<string, string>();
+    for (const section of targetSections) {
+      for (const errorCode of section.errorCodes) {
+        targetErrorCodes.set(errorCode.code, errorCode.line);
       }
     }
 
-    // 按源文件顺序重建
-    let organizedContent = '';
-    let nonErrorCodeIndex = 0;
+    // 按源文件结构重建目标文件
+    const result: string[] = [];
 
-    for (const line of sourceLines) {
-      const trimmedLine = line.trim();
-      const match = trimmedLine.match(/['"`]([^'"`]+)['"`]\s*:\s*['"`]/);
+    for (const sourceSection of sourceSections) {
+      result.push(sourceSection.comment);
 
-      if (match) {
-        // 错误码行：按源文件顺序输出
-        const code = match[1];
-        const targetLine = targetErrorCodes.get(code);
+      // 查找目标文件中对应的错误码
+      for (const sourceErrorCode of sourceSection.errorCodes) {
+        const targetLine = targetErrorCodes.get(sourceErrorCode.code);
         if (targetLine) {
-          organizedContent += targetLine + '\n';
-        }
-      } else {
-        // 非错误码行：保持原样
-        if (nonErrorCodeIndex < nonErrorCodeLines.length) {
-          organizedContent += nonErrorCodeLines[nonErrorCodeIndex] + '\n';
-          nonErrorCodeIndex++;
-        } else {
-          organizedContent += line + '\n';
+          result.push(targetLine);
         }
       }
     }
 
-    // 移除末尾的多余空行
-    return organizedContent.replace(/\n+$/, '\n');
+    return result.join('\n');
   }
 } 

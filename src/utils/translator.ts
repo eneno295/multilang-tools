@@ -1,4 +1,5 @@
-import fetch from 'node-fetch';
+// 使用 VS Code 内置的 fetch，无需导入 node-fetch
+declare const fetch: (url: string, options?: any) => Promise<any>;
 
 // Google 翻译（需第三方包，暂用 MyMemory 兜底）
 export async function googleTranslate(text: string, targetLang = 'en', sourceLang = 'zh-cn'): Promise<string> {
