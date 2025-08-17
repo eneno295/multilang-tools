@@ -1,63 +1,66 @@
 /**
- * 错误码文件路径配置功能
+ * 批量翻译工具文件路径配置功能
  * 
- * @description 用于配置错误码文件路径，包括错误码文件目录、错误码源文件、错误码执行文件
+ * @description 用于配置批量翻译工具的文件路径，包括翻译文件目录、翻译源文件、翻译目标文件
  * 
  * @example 
- * 错误码文件目录：存放错误码文件的根目录路径，默认：public/errCode
- * 错误码源文件：原始错误码的文件名，默认：zh-CN.js
- * 错误码执行文件：需要执行错误码文件的文件名，默认：all，表示执行错误码文件目录下的全部文件
+ * 翻译文件目录：存放翻译文件的根目录路径，默认：public/errCode
+ * 翻译源文件：原始翻译的文件名，默认：zh-CN.js
+ * 翻译目标文件：需要翻译的目标文件名，默认：all，表示翻译翻译文件目录下的全部文件
  */
 import { FileConfigCommand, FileConfigOptions } from '../fileConfigCommand';
 import * as vscode from 'vscode';
 
-const errorCodeOptions: FileConfigOptions = {
-  prefix: 'errorCode',
-  defaultDir: 'public/errCode',
-  defaultSourceFile: 'zh-CN.js',
+const batchTranslateOptions: FileConfigOptions = {
+  prefix: 'translate',
+  defaultDir: 'src/lang/locales',
+  defaultSourceFile: 'zh-CN.ts',
   defaultExecFile: 'all',
-  fileExt: '.js',
-  title: '错误码文件配置',
+  fileExt: '.ts',
+  title: '翻译文件配置',
   descList: [
-    '<strong>错误码文件目录：</strong>存放错误码文件的根目录路径',
-    '<strong>错误码源文件：</strong>原始错误码的文件名',
-    '<strong>错误码执行文件：</strong>需要执行错误码文件的文件名'
+    '<strong>翻译文件目录：</strong>存放翻译文件的根目录路径',
+    '<strong>翻译源文件：</strong>原始翻译的文件名',
+    '<strong>翻译目标文件：</strong>需要翻译的目标文件名'
   ],
-  dirLabel: '错误码文件目录：',
-  dirPlaceholder: '例如：public/errCode',
+  dirLabel: '翻译文件目录：',
+  dirPlaceholder: '例如：src/lang/locales',
   dirDesc: '相对于项目根目录的路径',
-  sourceFileLabel: '错误码源文件：',
-  sourceFilePlaceholder: '例如：zh-CN.js',
-  sourceFileDesc: '默认中文：zh-CN.js',
-  execFileLabel: '错误码执行文件：',
-  execFilePlaceholder: '例如：en-US.js,es-ES.js',
-  execFileDesc: '默认错误码文件目录下的全部文件：all'
+  sourceFileLabel: '翻译源文件：',
+  sourceFilePlaceholder: '例如：zh-CN.ts',
+  sourceFileDesc: '默认中文：zh-CN.ts',
+  execFileLabel: '翻译目标文件：',
+  execFilePlaceholder: '例如：en-US.ts,es-ES.ts',
+  execFileDesc: '默认翻译文件目录下的全部文件：all'
 };
 
-export class ErrorCodeConfigCommand extends FileConfigCommand {
+export class BatchTranslateConfigCommand extends FileConfigCommand {
   private currentPanel: vscode.WebviewPanel | undefined;
 
   constructor() {
-    super(errorCodeOptions);
+    super(batchTranslateOptions);
     this.currentPanel = undefined;
   }
+
   async execute() {
     if (this.currentPanel) {
       this.currentPanel.reveal(vscode.ViewColumn.One);
       return;
     }
+
     const panel = vscode.window.createWebviewPanel(
-      `${errorCodeOptions.prefix}Config`,
-      errorCodeOptions.title,
+      `${batchTranslateOptions.prefix}Config`,
+      batchTranslateOptions.title,
       vscode.ViewColumn.One,
       {
         enableScripts: true,
         retainContextWhenHidden: true
       }
     );
+
     this.currentPanel = panel;
 
-    // 先调用基类的 fillPanel 方法设置基本界面
+    // 使用基类的 fillPanel 方法
     super.fillPanel(panel);
 
     // 重写消息监听器，在基类逻辑基础上添加我们的刷新逻辑
@@ -83,6 +86,8 @@ export class ErrorCodeConfigCommand extends FileConfigCommand {
     });
   }
 
+
+
   private async handleSaveConfigWithRefresh(config: any, panel: vscode.WebviewPanel) {
     try {
       const vscodeConfig = vscode.workspace.getConfiguration('multilang-tools');
@@ -97,20 +102,20 @@ export class ErrorCodeConfigCommand extends FileConfigCommand {
         message: `${this.options.title}已保存！`
       });
 
-      // 保存成功后立即刷新错误码文件列表
-      this.refreshErrorCodeFiles();
+      // 保存成功后立即刷新翻译文件列表
+      this.refreshTranslationFiles();
 
     } catch (error) {
-      console.error('保存错误码配置失败:', error);
+      console.error('保存翻译配置失败:', error);
       vscode.window.showErrorMessage(`保存配置失败: ${error}`);
     }
   }
 
-  private refreshErrorCodeFiles() {
-    // 获取全局的错误码管理器提供者并刷新
-    const errorCodeProvider = (globalThis as any).multilangErrorCodeProvider;
-    if (errorCodeProvider && typeof errorCodeProvider.refresh === 'function') {
-      errorCodeProvider.refresh();
+  private refreshTranslationFiles() {
+    // 获取全局的批量翻译管理器提供者并刷新
+    const batchTranslateProvider = (globalThis as any).multilangBatchTranslateProvider;
+    if (batchTranslateProvider && typeof batchTranslateProvider.refresh === 'function') {
+      batchTranslateProvider.refresh();
     }
   }
-}
+} 

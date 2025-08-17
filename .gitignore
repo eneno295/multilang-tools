@@ -107,3 +107,5 @@ temp/
 /cypress/videos/
 /cypress/screenshots/
 zh-CN.js
+en-US.ts
+zh-CN.ts

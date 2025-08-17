@@ -55,12 +55,6 @@
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "batchTranslateManager",
-        "contents": "[文件路径配置](command:multilang-tools.batchConfigPath)\n[批量翻译](command:multilang-tools.batchTranslate)\n[整理文件](command:multilang-tools.batchOrganizeFile)"
-      }
-    ],
     "commands": [
       {
         "command": "multilang-tools.configPath",
@@ -101,6 +95,11 @@
         "command": "multilang-tools.refreshNumberCodeFiles",
         "title": "刷新错误码文件",
         "category": "多语言工具"
+      },
+      {
+        "command": "multilang-tools.refreshTranslationFiles",
+        "title": "刷新翻译文件",
+        "category": "多语言工具"
       }
     ],
     "configuration": {
@@ -120,6 +119,21 @@
           "type": "string",
           "default": "all",
           "description": "错误码执行文件名"
+        },
+        "multilang-tools.translatePath": {
+          "type": "string",
+          "default": "src/lang/locales",
+          "description": "翻译文件目录路径"
+        },
+        "multilang-tools.translateSourceFile": {
+          "type": "string",
+          "default": "zh-CN.ts",
+          "description": "翻译源文件名"
+        },
+        "multilang-tools.translateExecFile": {
+          "type": "string",
+          "default": "all",
+          "description": "翻译目标文件名"
         }
       }
     },
@@ -128,6 +142,11 @@
         {
           "command": "multilang-tools.refreshNumberCodeFiles",
           "when": "view == errorManager",
+          "group": "navigation"
+        },
+        {
+          "command": "multilang-tools.refreshTranslationFiles",
+          "when": "view == batchTranslateManager",
           "group": "navigation"
         }
       ]
