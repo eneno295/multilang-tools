@@ -678,7 +678,7 @@
         // 重新获取最新的源文件信息
         setTimeout(() => {
           vscode.postMessage({ command: 'getFileList' });
-        }, 500);
+        }, 300);
       } else {
         // 目标文件整理
         data.results.forEach(r => {
@@ -740,7 +740,7 @@
       if (type === '源文件') {
         setTimeout(() => {
           vscode.postMessage({ command: 'getFileList' });
-        }, 500);
+        }, 300);
       }
     }
 
@@ -771,7 +771,7 @@
         // 延迟刷新，确保文件系统操作完成
         setTimeout(() => {
           vscode.postMessage({ command: 'getCleanBackupList', type: currentCleanType });
-        }, 500);
+        }, 300);
       }
 
       // 如果是一键删除全部操作，重置标志
@@ -806,19 +806,14 @@
 
     // 清理单个备份文件
     function cleanSingleBackup(type, fileName) {
-      showConfirmDialog(
-        `确定要删除备份文件 ${fileName} 吗？`,
-        () => {
-          hideConfirmDialog();
-          showLoading();
-          // 标记这是单个删除操作
-          window.isCleanAllOperation = false;
-          vscode.postMessage({
-            command: type === 'source' ? 'cleanBackupSource' : 'cleanBackupTarget',
-            backupFile: fileName
-          });
-        }
-      );
+      // 单个删除直接执行，不显示确认框
+      showLoading();
+      // 标记这是单个删除操作
+      window.isCleanAllOperation = false;
+      vscode.postMessage({
+        command: type === 'source' ? 'cleanBackupSource' : 'cleanBackupTarget',
+        backupFile: fileName
+      });
     }
 
     // 清理所有备份文件

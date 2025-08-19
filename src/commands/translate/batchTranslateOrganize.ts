@@ -814,42 +814,193 @@ export class BatchTranslateOrganizeCommand {
   }
 
   /**
-   * 整理目标文件
-   * 按照源文件的结构重新组织目标文件
-   * @param sourceContent 源文件内容
-   * @param targetContent 目标文件内容
-   * @returns 整理后的内容
-   */
+ * 整理目标文件
+ * 按照源文件的结构重新组织目标文件
+ * @param sourceContent 源文件内容
+ * @param targetContent 目标文件内容
+ * @returns 整理后的内容
+ */
   private organizeTargetFile(sourceContent: string, targetContent: string): string {
     try {
-      // 解析源文件结构，获取顶层键的顺序
-      const sourceTopLevelKeys = this.getSourceTopLevelKeys(sourceContent);
+      // 解析源文件和目标文件
+      const sourceData = this.parseFileData(sourceContent);
+      const targetData = this.parseFileData(targetContent);
 
-      // 解析目标文件，保持原始格式
-      const targetSections = this.parseTargetFileSections(targetContent);
-
-      // 按照源文件顺序重新组织目标文件
+      // 按照源文件结构重新生成目标文件
       const organizedLines: string[] = [];
 
       // 添加 export default
       organizedLines.push('export default {');
 
-      // 按照源文件顺序添加顶层键值对
-      for (const topLevelKey of sourceTopLevelKeys) {
-        if (targetSections.has(topLevelKey)) {
-          const sectionContent = targetSections.get(topLevelKey)!;
-          organizedLines.push(...sectionContent);
+      // 遍历源文件的每个顶层键
+      const sourceTopLevelKeys = Object.keys(sourceData);
+      for (let k = 0; k < sourceTopLevelKeys.length; k++) {
+        const topLevelKey = sourceTopLevelKeys[k];
+        const isLastTopLevelKey = k === sourceTopLevelKeys.length - 1;
+
+        // 添加顶层键开始
+        organizedLines.push(`  "${topLevelKey}": {`);
+
+        // 获取源文件该键下的所有子键
+        const sourceSubKeys = sourceData[topLevelKey] ? Object.keys(sourceData[topLevelKey]) : [];
+
+        // 遍历源文件的每个子键
+        for (let i = 0; i < sourceSubKeys.length; i++) {
+          const sourceSubKey = sourceSubKeys[i];
+          const isLast = i === sourceSubKeys.length - 1;
+
+          // 检查目标文件是否有这个键
+          if (targetData[topLevelKey] && targetData[topLevelKey][sourceSubKey]) {
+            const targetValue = targetData[topLevelKey][sourceSubKey];
+
+            if (typeof targetValue === 'string') {
+              // 处理字符串值
+              let formattedValue = targetValue.replace(/\n/g, '\\n');
+              if (formattedValue.includes('"')) {
+                formattedValue = `"${formattedValue.replace(/"/g, '\\"')}"`;
+              } else {
+                formattedValue = `"${formattedValue}"`;
+              }
+              organizedLines.push(`    "${sourceSubKey}": ${formattedValue}${isLast ? '' : ','}`);
+            } else if (typeof targetValue === 'object' && targetValue !== null) {
+              // 处理嵌套对象
+              organizedLines.push(`    "${sourceSubKey}": {`);
+
+              const sourceNestedKeys = sourceData[topLevelKey][sourceSubKey] ? Object.keys(sourceData[topLevelKey][sourceSubKey]) : [];
+
+              // 遍历源文件的每个嵌套键
+              for (let j = 0; j < sourceNestedKeys.length; j++) {
+                const sourceNestedKey = sourceNestedKeys[j];
+                const isNestedLast = j === sourceNestedKeys.length - 1;
+
+                // 检查目标文件是否有这个嵌套键
+                if (targetValue[sourceNestedKey]) {
+                  const nestedValue = targetValue[sourceNestedKey];
+                  if (typeof nestedValue === 'string') {
+                    let formattedNestedValue = nestedValue.replace(/\n/g, '\\n');
+                    if (formattedNestedValue.includes('"')) {
+                      formattedNestedValue = `"${formattedNestedValue.replace(/"/g, '\\"')}"`;
+                    } else {
+                      formattedNestedValue = `"${formattedNestedValue}"`;
+                    }
+                    organizedLines.push(`      "${sourceNestedKey}": ${formattedNestedValue}${isNestedLast ? '' : ','}`);
+                  }
+                }
+              }
+
+              organizedLines.push(`    }${isLast ? '' : ','}`);
+            }
+          }
+        }
+
+        // 结束顶层键
+        if (isLastTopLevelKey) {
+          organizedLines.push('  }'); // 最后一个顶层键，不加逗号
+        } else {
+          organizedLines.push('  },'); // 不是最后一个顶层键，加逗号
         }
       }
 
       // 添加结束括号
-      organizedLines.push('}');
+      organizedLines.push('};');
 
-      return organizedLines.join('\n');
+      // 生成整理后的内容
+      let organizedContent = organizedLines.join('\n');
+
+      // 提取源文件注释并在最后阶段添加
+      const sourceComments = this.extractSourceComments(sourceContent);
+      organizedContent = this.addCommentsToOrganizedContent(organizedContent, sourceComments);
+
+      return organizedContent;
     } catch (error) {
       console.error('整理目标文件失败:', error);
       return targetContent; // 失败时返回原内容
     }
+  }
+
+  /**
+   * 解析文件内容，提取所有数据
+   * @param content 文件内容
+   * @returns 解析后的对象
+   */
+  private parseFileData(content: string): any {
+    try {
+      const cleanContent = content
+        .replace(/export\s+default\s*/, '')
+        .replace(/;$/, '');
+
+      const parsed = new Function('return (' + cleanContent + ')')();
+      return parsed;
+    } catch (error) {
+      console.error('解析文件失败:', error);
+      return {};
+    }
+  }
+
+  /**
+   * 提取源文件的注释信息
+   * @param sourceContent 源文件内容
+   * @returns 注释映射对象，键为注释所在行的键名，值为注释内容
+   */
+  private extractSourceComments(sourceContent: string): Map<string, string> {
+    const comments = new Map<string, string>();
+    const lines = sourceContent.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // 检查是否是注释行
+      if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
+        // 查找下一行的键名
+        for (let j = i + 1; j < lines.length; j++) {
+          const nextLine = lines[j].trim();
+          if (nextLine.includes('":')) {
+            // 提取键名
+            const keyMatch = nextLine.match(/"([^"]+)":/);
+            if (keyMatch) {
+              const key = keyMatch[1];
+              comments.set(key, line);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    return comments;
+  }
+
+  /**
+   * 在整理后的内容中添加注释
+   * @param organizedContent 整理后的内容
+   * @param sourceComments 源文件注释映射
+   * @returns 添加注释后的内容
+   */
+  private addCommentsToOrganizedContent(organizedContent: string, sourceComments: Map<string, string>): string {
+    const lines = organizedContent.split('\n');
+    const resultLines: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // 检查是否是键值对行
+      if (line.includes('":')) {
+        const keyMatch = line.match(/"([^"]+)":/);
+        if (keyMatch) {
+          const key = keyMatch[1];
+
+          // 查找是否有对应的注释
+          if (sourceComments.has(key)) {
+            const comment = sourceComments.get(key)!;
+            resultLines.push(`    ${comment}`);
+          }
+        }
+      }
+
+      resultLines.push(line);
+    }
+
+    return resultLines.join('\n');
   }
 
   /**
@@ -875,18 +1026,30 @@ export class BatchTranslateOrganizeCommand {
   }
 
   /**
-   * 解析目标文件为 sections
-   * 保持原始格式，按顶层键分组
-   * @param targetContent 目标文件内容
-   * @returns 按顶层键分组的行数组
-   */
+ * 解析目标文件为 sections
+ * 基于对象结构而不是缩进来识别顶层键
+ * @param targetContent 目标文件内容
+ * @returns 按顶层键分组的行数组
+ */
   private parseTargetFileSections(targetContent: string): Map<string, string[]> {
     const targetSections = new Map<string, string[]>();
 
     try {
+      // 首先尝试解析整个文件，获取对象结构
+      const cleanContent = targetContent
+        .replace(/export\s+default\s*/, '')
+        .replace(/;$/, '');
+
+      const parsed = new Function('return (' + cleanContent + ')')();
+      const topLevelKeys = Object.keys(parsed);
+
+      // 现在按照对象结构来分割文件内容
       const lines = targetContent.split('\n');
       let currentSection: string | null = null;
       let currentSectionLines: string[] = [];
+      let braceCount = 0;
+      let inSection = false;
+      let foundKeys = new Set<string>();
 
       for (const line of lines) {
         const trimmedLine = line.trim();
@@ -896,20 +1059,52 @@ export class BatchTranslateOrganizeCommand {
           continue;
         }
 
-        // 检查是否是新的顶层键（以 "key": { 开头）
-        const sectionMatch = trimmedLine.match(/^"([^"]+)":\s*\{/);
+        // 检查是否是新的顶层键
+        const sectionMatch = trimmedLine.match(/^("?)([^":]+)\1:\s*\{/);
         if (sectionMatch) {
-          // 保存前一个section
-          if (currentSection && currentSectionLines.length > 0) {
-            targetSections.set(currentSection, [...currentSectionLines]);
-          }
+          const keyName = sectionMatch[2];
 
-          // 开始新的section
-          currentSection = sectionMatch[1];
-          currentSectionLines = [line];
-        } else if (currentSection && trimmedLine !== '') {
+          // 检查这个键是否在解析出的顶层键列表中
+          if (topLevelKeys.includes(keyName) && !foundKeys.has(keyName)) {
+            // 保存前一个section
+            if (currentSection && currentSectionLines.length > 0) {
+              targetSections.set(currentSection, [...currentSectionLines]);
+            }
+
+            // 开始新的section
+            currentSection = keyName;
+            currentSectionLines = [line];
+            inSection = true;
+            braceCount = 1;
+            foundKeys.add(keyName);
+          } else {
+            // 继续添加到当前section，并更新大括号计数
+            if (inSection) {
+              currentSectionLines.push(line);
+              if (line.includes('{')) {
+                braceCount++;
+              }
+              if (line.includes('}')) {
+                braceCount--;
+              }
+            }
+          }
+        } else if (inSection) {
           // 添加到当前section
           currentSectionLines.push(line);
+
+          // 计算大括号数量
+          if (line.includes('{')) {
+            braceCount++;
+          }
+          if (line.includes('}')) {
+            braceCount--;
+          }
+
+          // 如果大括号数量为0，说明当前section结束
+          if (braceCount === 0) {
+            inSection = false;
+          }
         }
       }
 
