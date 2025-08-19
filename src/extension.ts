@@ -4,6 +4,7 @@ import { ErrorCodeAddCommand } from './commands/errorCode/errorCodeAdd';
 import { BatchTranslateCommand } from './commands/errorCode/batchTranslate';
 import { FileOrganizeCommand } from './commands/errorCode/fileOrganize';
 import { BatchTranslateConfigCommand } from './commands/translate/batchTranslateConfig';
+import { BatchTranslateOrganizeCommand } from './commands/translate/batchTranslateOrganize';
 import { ErrorCodeManagerProvider } from './providers/ErrorCodeManagerProvider';
 import { BatchTranslateManagerProvider } from './providers/BatchTranslateManagerProvider';
 
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
   const batchTranslate = new BatchTranslateCommand();
   const fileOrganize = new FileOrganizeCommand();
   const batchTranslateConfig = new BatchTranslateConfigCommand();
+  const batchTranslateOrganize = new BatchTranslateOrganizeCommand();
 
   // 创建错误码管理器提供者
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -81,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   const batchOrganizeFileCommand = vscode.commands.registerCommand('multilang-tools.batchOrganizeFile', () => {
-    fileOrganize.execute();
+    batchTranslateOrganize.execute();
   });
 
   // 刷新错误码文件列表

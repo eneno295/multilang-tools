@@ -30,6 +30,12 @@ export class TranslationFile extends vscode.TreeItem {
 
     this.tooltip = `${fileName} (${translationCount} 个翻译)`;
     this.contextValue = 'translationFile';
+    this.iconPath = new vscode.ThemeIcon('file-code');
+    this.command = {
+      command: 'vscode.open',
+      title: '打开翻译文件',
+      arguments: [vscode.Uri.file(this.filePath)]
+    };
   }
 }
 
@@ -145,39 +151,32 @@ export class BatchTranslateManagerProvider implements vscode.TreeDataProvider<Ba
   }
 
   private countTranslations(content: string): number {
-    const lines = content.split('\n');
+    try {
+      // 移除 export default 和最后的 ;
+      const cleanContent = content
+        .replace(/^export\s+default\s*/, '')
+        .replace(/;$/, '');
+
+      // 解析为对象
+      const structure = eval(`(${cleanContent})`);
+      return this.countTranslationsRecursive(structure);
+    } catch (error) {
+      console.error('解析翻译文件失败:', error);
+      return 0;
+    }
+  }
+
+  private countTranslationsRecursive(obj: any): number {
     let count = 0;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-
-      // 支持多种格式：
-      // 1. 直接的键值对: "key": "value"
-      // 2. 对象属性: key: "value"
-      // 3. 嵌套对象中的键值对
-
-      // 匹配 "key": "value" 格式
-      let match = trimmed.match(/^["']([^"']+)["']\s*:\s*["']/);
-      if (match) {
+    for (const key in obj) {
+      if (typeof obj[key] === 'object' && obj[key] !== null) {
+        // 如果是对象，递归计算子对象的键数
+        count += this.countTranslationsRecursive(obj[key]);
+      } else {
+        // 如果是叶子节点（字符串值），计数加1
         count++;
-        continue;
-      }
-
-      // 匹配 key: "value" 格式
-      match = trimmed.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*["']/);
-      if (match) {
-        count++;
-        continue;
-      }
-
-      // 匹配嵌套对象中的键值对
-      match = trimmed.match(/^\s*["']([^"']+)["']\s*:\s*["']/);
-      if (match) {
-        count++;
-        continue;
       }
     }
-
     return count;
   }
 } 

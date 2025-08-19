@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>批量翻译工具 - 文件整理</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      color: var(--vscode-textLink-foreground);
+      margin-bottom: 10px;
+    }
+
+    .description {
+      color: var(--vscode-descriptionForeground);
+      line-height: 1.6;
+    }
+
+    .section {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .button-group>div {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .button-group .btn {
+      width: 100%;
+      margin: 0;
+    }
+
+    .button-group .secondary-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .button-group .secondary-buttons .btn {
+      flex: 1;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+
+    .btn {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+
+    .btn:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+
+    .btn.secondary {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+
+    .btn.secondary:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .btn.danger {
+      background: #f85149;
+      color: #ffffff;
+      border-color: #f85149;
+    }
+
+    .btn.danger:hover {
+      background: #d1242f;
+      border-color: #d1242f;
+    }
+
+    .list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .list li {
+      line-height: 1.8;
+    }
+
+    .file-badge {
+      color: var(--vscode-descriptionForeground);
+      margin-left: 6px;
+      font-size: 12px;
+    }
+
+    .result-card {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      padding-bottom: 12px;
+    }
+
+    .file-name {
+      font-weight: bold;
+      color: var(--vscode-textLink-foreground);
+      font-size: 16px;
+    }
+
+    .status {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .status.success {
+      background: var(--vscode-notificationsInfoIcon-foreground);
+    }
+
+    .status.error {
+      background: var(--vscode-notificationsErrorIcon-foreground);
+      color: #fff;
+    }
+
+    .result-stats {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-item {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--vscode-textLink-foreground);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .stat-item.missing {
+      border-color: var(--vscode-notificationsErrorIcon-foreground);
+    }
+
+    .stat-item.missing .stat-value {
+      color: var(--vscode-notificationsErrorIcon-foreground);
+    }
+
+    .stat-item.redundant {
+      border-color: var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    .stat-item.redundant .stat-value {
+      color: var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    /* Source info: 3-column brief stats */
+    .source-brief-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .brief-item {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .brief-label {
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .brief-value {
+      font-weight: bold;
+      font-size: 18px;
+      color: var(--vscode-editor-foreground);
+    }
+
+
+
+    .loading {
+      text-align: center;
+      color: var(--vscode-descriptionForeground);
+      padding: 20px;
+    }
+
+    .error {
+      color: var(--vscode-notificationsErrorIcon-foreground);
+      background: var(--vscode-inputValidation-errorBackground);
+      border: 1px solid var(--vscode-inputValidation-errorBorder);
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+
+    .file-info {
+      margin-bottom: 16px;
+      padding: 12px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* 备份文件选择器样式 */
+    .backup-selector {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1000;
+    }
+
+    .backup-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .backup-dialog {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 80%;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .backup-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .backup-header h3 {
+      margin: 0;
+      color: var(--vscode-editor-foreground);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--vscode-editor-foreground);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .close-btn:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+
+    .backup-list {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .backup-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      margin: 4px 0;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+
+    .backup-item:hover {
+      background: var(--vscode-editor-background);
+    }
+
+    .backup-info {
+      flex: 1;
+    }
+
+    .backup-name {
+      font-weight: bold;
+      color: var(--vscode-editor-foreground);
+      margin-bottom: 4px;
+    }
+
+    .backup-time {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .backup-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .backup-footer {
+      padding: 16px;
+      border-top: 1px solid var(--vscode-panel-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* 确认对话框样式 */
+    .confirm-dialog {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2000;
+    }
+
+    .confirm-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .confirm-content {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .confirm-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      text-align: center;
+    }
+
+    .confirm-header h3 {
+      margin: 0;
+      color: var(--vscode-editor-foreground);
+    }
+
+    .confirm-body {
+      padding: 20px 16px;
+      text-align: center;
+      color: var(--vscode-editor-foreground);
+      line-height: 1.5;
+    }
+
+    .confirm-footer {
+      padding: 16px;
+      border-top: 1px solid var(--vscode-panel-border);
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>批量翻译工具 - 文件整理</h1>
+      <div class="description">整理源文件和目标文件，支持备份和还原功能</div>
+    </div>
+
+    <div id="fileInfo" class="file-info" style="display: none;">
+      <strong>源文件: </strong><span id="sourceFileName"></span>,
+      <strong>目标语言文件: </strong><span id="targetFileNames"></span>
+    </div>
+
+    <div class="section">
+      <div class="button-group">
+        <div>
+          <button id="organizeSourceBtn" class="btn">整理源文件</button>
+          <div class="secondary-buttons">
+            <button id="restoreSourceBtn" class="btn secondary">还原</button>
+            <button id="cleanBackupSourceBtn" class="btn secondary">清理</button>
+          </div>
+        </div>
+        <div>
+          <button id="organizeTargetBtn" class="btn">整理目标文件</button>
+          <div class="secondary-buttons">
+            <button id="restoreTargetBtn" class="btn secondary">还原</button>
+            <button id="cleanBackupTargetBtn" class="btn secondary">清理</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sourceInfoSection" class="section" style="display: none;">
+      <strong style="display: block; margin-bottom: 10px;">源文件信息：</strong>
+      <div id="sourceInfoContent"></div>
+    </div>
+
+    <div id="resultsSection" class="section" style="display: none;">
+      <strong style="display: block; margin-bottom: 10px;" id="resultsTitle">操作结果：</strong>
+      <div id="resultsList"></div>
+    </div>
+
+    <div id="loadingSection" class="loading" style="display: none;">正在分析文件结构，请稍候...</div>
+    <div id="errorSection" class="error" style="display: none;"></div>
+
+    <!-- 备份文件选择器 -->
+    <div id="backupSelector" class="backup-selector" style="display: none;">
+      <div class="backup-overlay">
+        <div class="backup-dialog">
+          <div class="backup-header">
+            <h3 id="backupSelectorTitle">选择要还原的备份文件</h3>
+            <button class="close-btn" onclick="hideBackupSelector()">×</button>
+          </div>
+          <div class="backup-list" id="backupList">
+            <!-- 备份文件列表将在这里动态生成 -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 清理备份文件选择器 -->
+    <div id="cleanBackupSelector" class="backup-selector" style="display: none;">
+      <div class="backup-overlay">
+        <div class="backup-dialog">
+          <div class="backup-header">
+            <h3 id="cleanBackupSelectorTitle">选择要清理的备份文件</h3>
+            <button class="close-btn" onclick="hideCleanBackupSelector()">×</button>
+          </div>
+          <div class="backup-list" id="cleanBackupList">
+            <!-- 备份文件列表将在这里动态生成 -->
+          </div>
+          <div class="backup-footer" id="delFooter">
+            <button class="btn danger" onclick="cleanAllBackups()">一键删除全部</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 确认删除对话框 -->
+    <div id="confirmDialog" class="confirm-dialog" style="display: none;">
+      <div class="confirm-overlay">
+        <div class="confirm-content">
+          <div class="confirm-header">
+            <h3 id="confirmTitle">确认删除</h3>
+          </div>
+          <div class="confirm-body" id="confirmMessage">
+            <!-- 确认消息将在这里动态生成 -->
+          </div>
+          <div class="confirm-footer">
+            <button class="btn secondary" onclick="hideConfirmDialog()">取消</button>
+            <button class="btn danger" id="confirmDeleteBtn">确认删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+
+    document.getElementById('organizeSourceBtn').addEventListener('click', () => { showLoading(); hideError(); vscode.postMessage({ command: 'organizeSource' }); });
+    document.getElementById('organizeTargetBtn').addEventListener('click', () => { showLoading(); hideError(); vscode.postMessage({ command: 'organizeTarget' }); });
+    document.getElementById('restoreSourceBtn').addEventListener('click', () => { showBackupSelector('source'); });
+    document.getElementById('restoreTargetBtn').addEventListener('click', () => { showBackupSelector('target'); });
+    document.getElementById('cleanBackupSourceBtn').addEventListener('click', () => { showCleanBackupSelector('source'); });
+    document.getElementById('cleanBackupTargetBtn').addEventListener('click', () => { showCleanBackupSelector('target'); });
+
+    // 显示加载状态并隐藏结果区域
+    function showLoading() { document.getElementById('loadingSection').style.display = 'block'; document.getElementById('resultsSection').style.display = 'none'; }
+    // 隐藏加载状态
+    function hideLoading() { document.getElementById('loadingSection').style.display = 'none'; }
+    // 显示错误信息
+    function showError(msg) { const el = document.getElementById('errorSection'); el.textContent = msg; el.style.display = 'block'; }
+    // 隐藏错误信息
+    function hideError() { document.getElementById('errorSection').style.display = 'none'; }
+
+    // 创建结果卡片头部HTML
+    function createResultCardHeader(fileName, status, statusClass = 'success') {
+      return `
+        <div class="result-card">
+          <div class="result-header">
+            <div class="file-name">${fileName}</div>
+            <div class="status ${statusClass}">${status}</div>
+          </div>
+      `;
+    }
+
+    // 公共函数：创建统计信息HTML
+    function createStatsHTML(stats) {
+      return `
+        <div class="result-stats">
+          <div class="stat-item">
+            <div class="stat-value">${stats.originalLines}</div>
+            <div class="stat-label">原始行数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${stats.formattedLines || stats.organizedLines}(${(stats.formattedLines || stats.organizedLines) - stats.originalLines})</div>
+            <div class="stat-label">整理后行数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${stats.originalKeys}</div>
+            <div class="stat-label">原始键数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${stats.formattedKeys || stats.organizedKeys}</div>
+            <div class="stat-label">整理后键数</div>
+          </div>
+          <div class="stat-item missing">
+            <div class="stat-value">${stats.missingKeys || 0}</div>
+            <div class="stat-label">缺失键数</div>
+          </div>
+          <div class="stat-item redundant">
+            <div class="stat-value">${stats.redundantKeys || 0}</div>
+            <div class="stat-label">多余键数</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 公共函数：显示结果
+    function showResults(title, content) {
+      hideLoading();
+
+      const resultsTitle = document.getElementById('resultsTitle');
+      resultsTitle.textContent = title;
+
+      const list = document.getElementById('resultsList');
+      list.innerHTML = content;
+
+      document.getElementById('resultsSection').style.display = 'block';
+    }
+
+    // 渲染文件列表和源文件信息
+    function renderTargets(files, sourceInfo) {
+      // 调试信息
+      console.log('renderTargets - files:', files);
+      console.log('renderTargets - sourceInfo:', sourceInfo);
+
+      // 显示文件信息
+      if (files.length > 0) {
+        const sourceFile = files.find(f => f.isSource)?.name || '未知';
+        const targetFiles = files.filter(f => f.isTarget).map(f => f.name).join(', ');
+
+        document.getElementById('sourceFileName').textContent = sourceFile;
+        document.getElementById('targetFileNames').textContent = targetFiles || '无';
+        document.getElementById('fileInfo').style.display = 'block';
+      }
+
+      // 总是显示源文件信息，如果没有则从files中获取
+      if (sourceInfo) {
+        console.log('Using sourceInfo from parameter');
+        showSourceInfo({ sourceInfo });
+      } else if (files.length > 0) {
+        const sourceFileInfo = files.find(f => f.isSource);
+        if (sourceFileInfo) {
+          console.log('Using sourceFileInfo from files array');
+          showSourceInfo({ sourceInfo: sourceFileInfo });
+        }
+      }
+    }
+
+    // 显示源文件统计信息
+    function showSourceInfo(data) {
+      if (data.sourceInfo) {
+        const content = document.getElementById('sourceInfoContent');
+        content.innerHTML = `
+          <div class="source-brief-stats">
+            <div class="brief-item">
+              <div class="brief-label">源文件</div>
+              <div class="brief-value">${data.sourceInfo.name}</div>
+            </div>
+            <div class="brief-item">
+              <div class="brief-label">总行数</div>
+              <div class="brief-value">${data.sourceInfo.lines || data.sourceInfo.totalLines || 0}</div>
+            </div>
+            <div class="brief-item">
+              <div class="brief-label">总键数</div>
+              <div class="brief-value">${data.sourceInfo.keys || data.sourceInfo.totalKeys || 0}</div>
+            </div>
+          </div>
+        `;
+        document.getElementById('sourceInfoSection').style.display = 'block';
+      }
+    }
+
+    // 显示整理结果（通用函数）
+    function showOrganizeResults(data, type, title) {
+      let content = '';
+
+      if (type === 'source') {
+        // 源文件整理
+        if (data.sourceInfo) {
+          showSourceInfo(data);
+        }
+
+        const stats = {
+          originalLines: data.originalLines,
+          formattedLines: data.formattedLines,
+          originalKeys: data.originalKeys,
+          formattedKeys: data.formattedKeys,
+          missingKeys: 0,
+          redundantKeys: 0
+        };
+
+        content = createResultCardHeader(
+          data.sourceInfo?.name || '源文件',
+          data.hasChanges ? '已整理' : '无需整理'
+        ) + createStatsHTML(stats) + '</div>';
+
+        // 重新获取最新的源文件信息
+        setTimeout(() => {
+          vscode.postMessage({ command: 'getFileList' });
+        }, 500);
+      } else {
+        // 目标文件整理
+        data.results.forEach(r => {
+          if (r.status === '已整理') {
+            const stats = {
+              originalLines: r.originalLines,
+              organizedLines: r.organizedLines,
+              originalKeys: r.originalKeys,
+              organizedKeys: r.organizedKeys,
+              missingKeys: r.missingKeys || 0,
+              redundantKeys: r.redundantKeys || 0
+            };
+
+            content += createResultCardHeader(r.name, r.status, 'success') +
+              createStatsHTML(stats) + '</div>';
+          } else {
+            content += createResultCardHeader(r.name, r.status, 'error') +
+              `<div style="padding: 10px; color: var(--vscode-notificationsErrorIcon-foreground);">${r.error || '整理失败'}</div></div>`;
+          }
+        });
+      }
+
+      showResults(title, content);
+    }
+
+    // 显示文件还原结果
+    function showRestoreResults(data, type) {
+      let content = '';
+
+      if (type === '源文件') {
+        // 显示源文件还原结果，显示备份文件名
+        const backupFileName = data.backupFile || '备份文件';
+        content = createResultCardHeader(backupFileName, '已还原') + '</div>';
+      } else {
+        data.results.forEach(r => {
+          let statusClass = 'success';
+          let extraContent = '';
+          let displayName = r.name; // 默认显示文件名
+
+          if (r.status === '已还原') {
+            statusClass = 'success';
+            // 如果有备份文件信息，显示备份文件名
+            displayName = r.backupFile || r.name;
+          } else if (r.status === '无备份文件') {
+            statusClass = 'error';
+            extraContent = '<div style="padding: 10px; color: var(--vscode-notificationsErrorIcon-foreground);">该文件没有备份，无法还原</div>';
+          } else if (r.status === '还原失败') {
+            statusClass = 'error';
+            extraContent = `<div style="padding: 10px; color: var(--vscode-notificationsErrorIcon-foreground);">${r.error || '还原失败'}</div>`;
+          }
+
+          content += createResultCardHeader(displayName, r.status, statusClass) + extraContent + '</div>';
+        });
+      }
+
+      showResults(`${type}还原结果：`, content);
+
+      // 如果是源文件还原，重新获取最新的源文件信息
+      if (type === '源文件') {
+        setTimeout(() => {
+          vscode.postMessage({ command: 'getFileList' });
+        }, 500);
+      }
+    }
+
+    // 显示备份文件清理结果
+    function showCleanBackupResults(data, type = '') {
+      let content = '';
+
+      if (data.results.length === 0) {
+        content = `
+          <div class="result-card">
+            <div style="padding: 20px; text-align: center; color: var(--vscode-descriptionForeground);">
+              没有找到${type}备份文件
+            </div>
+          </div>
+        `;
+      } else {
+        data.results.forEach(r => {
+          const statusClass = r.status === '已删除' ? 'success' : 'error';
+          content += createResultCardHeader(r.name, r.status, statusClass) +
+            `${r.error ? `<div style="padding: 10px; color: var(--vscode-notificationsErrorIcon-foreground);">${r.error}</div>` : ''}</div>`;
+        });
+      }
+
+      showResults(`清理${type}备份结果：`, content);
+
+      // 清理成功后刷新备份列表（仅当是单个删除时）
+      if (data.results.some(r => r.status === '已删除') && !window.isCleanAllOperation) {
+        // 延迟刷新，确保文件系统操作完成
+        setTimeout(() => {
+          vscode.postMessage({ command: 'getCleanBackupList', type: currentCleanType });
+        }, 500);
+      }
+
+      // 如果是一键删除全部操作，重置标志
+      if (window.isCleanAllOperation) {
+        window.isCleanAllOperation = false;
+      }
+    }
+
+    // 显示备份文件选择器
+    function showBackupSelector(type) {
+      hideError();
+      vscode.postMessage({ command: 'getBackupList', type: type });
+    }
+
+    // 隐藏备份文件选择器
+    function hideBackupSelector() {
+      document.getElementById('backupSelector').style.display = 'none';
+    }
+
+    // 显示清理备份文件选择器
+    function showCleanBackupSelector(type) {
+      hideError();
+      vscode.postMessage({ command: 'getCleanBackupList', type: type });
+    }
+
+    // 隐藏清理备份文件选择器
+    function hideCleanBackupSelector() {
+      document.getElementById('cleanBackupSelector').style.display = 'none';
+    }
+
+    let currentCleanType = '';
+
+    // 清理单个备份文件
+    function cleanSingleBackup(type, fileName) {
+      showConfirmDialog(
+        `确定要删除备份文件 ${fileName} 吗？`,
+        () => {
+          hideConfirmDialog();
+          showLoading();
+          // 标记这是单个删除操作
+          window.isCleanAllOperation = false;
+          vscode.postMessage({
+            command: type === 'source' ? 'cleanBackupSource' : 'cleanBackupTarget',
+            backupFile: fileName
+          });
+        }
+      );
+    }
+
+    // 清理所有备份文件
+    function cleanAllBackups() {
+      showConfirmDialog(
+        `确定要删除所有${currentCleanType === 'source' ? '源文件' : '目标文件'}备份吗？此操作不可撤销！`,
+        () => {
+          hideConfirmDialog();
+          hideCleanBackupSelector();
+          showLoading();
+          // 标记这是一键删除全部操作
+          window.isCleanAllOperation = true;
+          vscode.postMessage({
+            command: currentCleanType === 'source' ? 'cleanBackupSource' : 'cleanBackupTarget'
+          });
+        }
+      );
+    }
+
+    // 显示确认对话框
+    function showConfirmDialog(message, onConfirm) {
+      const messageElement = document.getElementById('confirmMessage');
+      const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+      messageElement.textContent = message;
+
+      // 移除之前的事件监听器
+      confirmBtn.onclick = null;
+
+      // 添加新的事件监听器
+      confirmBtn.onclick = onConfirm;
+
+      document.getElementById('confirmDialog').style.display = 'block';
+    }
+
+    // 隐藏确认对话框
+    function hideConfirmDialog() {
+      document.getElementById('confirmDialog').style.display = 'none';
+    }
+
+    // 格式化备份时间戳
+    function formatBackupTime(timestamp) {
+      // 解析 YYYY-MM-DD-HH-MM-SS 格式的时间戳
+      const parts = timestamp.split('-');
+      if (parts.length === 6) {
+        const [year, month, day, hour, minute, second] = parts;
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+      }
+      return timestamp; // 如果格式不对，直接返回原值
+    }
+
+    // 从备份文件还原
+    function restoreFromBackup(type, fileName) {
+      hideBackupSelector();
+      showLoading();
+      vscode.postMessage({
+        command: type === 'source' ? 'restoreSource' : 'restoreTarget',
+        backupFile: fileName
+      });
+    }
+
+    // 显示备份文件列表（通用函数）
+    function showBackupListCommon(data, isClean = false) {
+      const titleElement = document.getElementById(isClean ? 'cleanBackupSelectorTitle' : 'backupSelectorTitle');
+      const listElement = document.getElementById(isClean ? 'cleanBackupList' : 'backupList');
+      const actionType = isClean ? '清理' : '还原';
+      const buttonText = isClean ? '删除' : '还原';
+      const buttonClass = isClean ? 'btn danger' : 'btn';
+
+      titleElement.textContent = `选择要${actionType}的${data.type === 'source' ? '源文件' : '目标文件'}备份`;
+
+      if (data.backups.length === 0) {
+        listElement.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--vscode-descriptionForeground);">
+            没有找到备份文件
+          </div>
+        `;
+        if (isClean) {
+          document.getElementById('delFooter').style.display = 'none';
+        }
+      } else {
+        listElement.innerHTML = data.backups.map(backup => `
+          <div class="backup-item">
+            <div class="backup-info">
+              <div class="backup-name">${backup.displayName}</div>
+              <div class="backup-time">${formatBackupTime(backup.timestamp)}</div>
+            </div>
+            <div class="backup-actions">
+              <button class="${buttonClass}" onclick="${isClean ?
+            `cleanSingleBackup('${data.type}', '${backup.fileName}')` :
+            `restoreFromBackup('${data.type}', '${backup.fileName}')`}">${buttonText}</button>
+            </div>
+          </div>
+        `).join('');
+        if (isClean) {
+          document.getElementById('delFooter').style.display = 'flex';
+        }
+      }
+
+      document.getElementById(isClean ? 'cleanBackupSelector' : 'backupSelector').style.display = 'block';
+    }
+
+    // 显示备份文件列表
+    function showBackupList(data) {
+      showBackupListCommon(data, false);
+    }
+
+    // 显示清理备份文件列表
+    function showCleanBackupList(data) {
+      currentCleanType = data.type;
+      showBackupListCommon(data, true);
+    }
+
+    window.addEventListener('message', event => {
+      const m = event.data;
+      switch (m.command) {
+        case 'organizeSourceResult':
+          m.success ? showOrganizeResults(m, 'source', '源文件整理结果：') : (hideLoading(), showError(m.message || '整理源文件失败'));
+          break;
+        case 'organizeTargetResult':
+          m.success ? showOrganizeResults(m, 'target', '目标文件整理结果：') : (hideLoading(), showError(m.message || '整理目标文件失败'));
+          break;
+        case 'restoreSourceResult':
+          m.success ? showRestoreResults(m, '源文件') : (hideLoading(), showError(m.message || '还原源文件失败'));
+          break;
+        case 'restoreTargetResult':
+          m.success ? showRestoreResults(m, '目标文件') : (hideLoading(), showError(m.message || '还原目标文件失败'));
+          break;
+        case 'cleanBackupSourceResult':
+          m.success ? showCleanBackupResults(m, '源文件') : (hideLoading(), showError(m.message || '清理源文件备份失败'));
+          break;
+        case 'cleanBackupTargetResult':
+          m.success ? showCleanBackupResults(m, '目标文件') : (hideLoading(), showError(m.message || '清理目标文件备份失败'));
+          break;
+        case 'backupListResult':
+          m.success ? showBackupList(m) : showError(m.message || '获取备份列表失败');
+          break;
+        case 'cleanBackupListResult':
+          m.success ? showCleanBackupList(m) : showError(m.message || '获取清理备份列表失败');
+          break;
+        case 'fileListResult':
+          m.success ? renderTargets(m.files || [], m.sourceInfo) : showError(m.message || '获取文件列表失败');
+          break;
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // 页面加载完成后自动获取文件列表，显示源文件信息
+      vscode.postMessage({ command: 'getFileList' });
+    });
+  </script>
+</body>
+
+</html>
