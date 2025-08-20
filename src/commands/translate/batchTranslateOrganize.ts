@@ -10,6 +10,9 @@ import * as path from 'path';
 export class BatchTranslateOrganizeCommand {
   private currentPanel: vscode.WebviewPanel | undefined;
 
+  // 常量定义
+  private static readonly BACKUP_EXTENSION = '.backup';
+
   /**
    * 构造函数
    * 初始化当前面板为 undefined
@@ -41,14 +44,32 @@ export class BatchTranslateOrganizeCommand {
    */
   private generateTimestamp(): string {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hour = String(now.getHours()).padStart(2, '0');
-    const minute = String(now.getMinutes()).padStart(2, '0');
-    const second = String(now.getSeconds()).padStart(2, '0');
+    return [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+      String(now.getHours()).padStart(2, '0'),
+      String(now.getMinutes()).padStart(2, '0'),
+      String(now.getSeconds()).padStart(2, '0')
+    ].join('-');
+  }
 
-    return `${year}-${month}-${day}-${hour}-${minute}-${second}`;
+  /**
+   * 检查是否应该创建备份文件
+   * @param backupDir 备份目录路径
+   * @param fileName 文件名（不含扩展名）
+   * @returns 是否应该创建备份
+   */
+  private shouldCreateBackup(backupDir: string, fileName: string): boolean {
+    if (!fs.existsSync(backupDir)) {
+      return true; // 备份目录不存在，需要创建备份
+    }
+
+    const existingBackups = fs.readdirSync(backupDir).filter(file =>
+      file.startsWith(fileName) && file.endsWith(BatchTranslateOrganizeCommand.BACKUP_EXTENSION)
+    );
+
+    return existingBackups.length === 0; // 没有现有备份时创建
   }
 
   /**
@@ -66,7 +87,7 @@ export class BatchTranslateOrganizeCommand {
 
     // 生成带时间戳的备份文件名
     const timestamp = this.generateTimestamp();
-    const backupFileName = `${fileName}_${timestamp}.backup`;
+    const backupFileName = `${fileName}_${timestamp}${BatchTranslateOrganizeCommand.BACKUP_EXTENSION}`;
     const backupPath = path.join(backupDir, backupFileName);
 
     // 写入备份文件
@@ -98,6 +119,20 @@ export class BatchTranslateOrganizeCommand {
       throw new Error('无法获取工作区路径');
     }
     return workspacePath;
+  }
+
+  /**
+   * 发送错误消息到前端
+   * @param panel WebView 面板实例
+   * @param command 命令名称
+   * @param message 错误消息
+   */
+  private sendErrorMessage(panel: vscode.WebviewPanel, command: string, message: string) {
+    panel.webview.postMessage({
+      command: command,
+      success: false,
+      message: message
+    });
   }
 
   /**
@@ -187,6 +222,12 @@ export class BatchTranslateOrganizeCommand {
           case 'getCleanBackupList':
             await this.handleGetCleanBackupList(panel, message.type);
             break;
+          case 'backupSource':
+            await this.handleBackupSource(panel);
+            break;
+          case 'backupTarget':
+            await this.handleBackupTarget(panel);
+            break;
         }
       },
       undefined,
@@ -209,11 +250,7 @@ export class BatchTranslateOrganizeCommand {
 
       // 检查源文件是否存在
       if (!fs.existsSync(sourceFilePath)) {
-        panel.webview.postMessage({
-          command: 'organizeSourceResult',
-          success: false,
-          message: `源文件不存在: ${sourceFilePath}`
-        });
+        this.sendErrorMessage(panel, 'organizeSourceResult', `源文件不存在: ${sourceFilePath}`);
         return;
       }
 
@@ -230,10 +267,11 @@ export class BatchTranslateOrganizeCommand {
       // 检查是否有内容变化
       const hasChanges = originalContent !== formattedContent;
 
-      // 创建备份文件
+      // 检查是否需要自动备份
       const backupDir = path.join(path.dirname(sourceFilePath), 'backups');
       const fileName = path.basename(config.sourceFile, path.extname(config.sourceFile));
-      this.createBackupFile(originalContent, backupDir, fileName);
+      const backupFileName = this.shouldCreateBackup(backupDir, fileName) ?
+        this.createBackupFile(originalContent, backupDir, fileName) : '';
 
       // 如果有变化，保存格式化后的内容
       if (hasChanges) {
@@ -261,11 +299,7 @@ export class BatchTranslateOrganizeCommand {
 
     } catch (error) {
       // 发送错误信息给前端
-      panel.webview.postMessage({
-        command: 'organizeSourceResult',
-        success: false,
-        message: `整理源文件失败: ${error}`
-      });
+      this.sendErrorMessage(panel, 'organizeSourceResult', `整理源文件失败: ${error}`);
     }
   }
 
@@ -318,14 +352,27 @@ export class BatchTranslateOrganizeCommand {
           const organizedKeys = this.countKeys(organizedContent);
           const organizedLines = organizedContent.split('\n').length;
 
-          // 计算统计信息
-          const missingKeys = Math.max(0, this.countKeys(sourceContent) - organizedKeys);
-          const redundantKeys = Math.max(0, organizedKeys - this.countKeys(sourceContent));
+          // 计算统计信息并获取具体的键值对信息
+          const sourceKeyValues = this.getAllKeyValues(sourceContent);
+          const targetKeyValues = this.getAllKeyValues(targetContent);
 
-          // 创建备份文件
+          // 获取具体的缺失键值对和多余键值对
+          const missingKeyList = sourceKeyValues.filter(sourceKV =>
+            !targetKeyValues.some(targetKV => targetKV.key === sourceKV.key)
+          );
+          const redundantKeyList = targetKeyValues.filter(targetKV =>
+            !sourceKeyValues.some(sourceKV => sourceKV.key === targetKV.key)
+          );
+
+          // 计算缺失键数和多余键数（基于实际的键名差异，而不是数量差异）
+          const missingKeys = missingKeyList.length;
+          const redundantKeys = redundantKeyList.length;
+
+          // 检查是否需要自动备份
           const backupDir = path.join(path.dirname(targetFilePath), 'backups');
           const fileName = path.basename(targetFileName, path.extname(targetFileName));
-          this.createBackupFile(targetContent, backupDir, fileName);
+          const backupFileName = this.shouldCreateBackup(backupDir, fileName) ?
+            this.createBackupFile(targetContent, backupDir, fileName) : '';
 
           // 保存整理后的内容
           fs.writeFileSync(targetFilePath, organizedContent, 'utf-8');
@@ -338,9 +385,10 @@ export class BatchTranslateOrganizeCommand {
             originalKeys,
             organizedKeys,
             missingKeys,
-            redundantKeys
+            redundantKeys,
+            missingKeyList: missingKeyList, // 显示所有缺失键
+            redundantKeyList: redundantKeyList // 显示所有多余键
           });
-
         } catch (error) {
           results.push({
             name: targetFileName,
@@ -362,11 +410,7 @@ export class BatchTranslateOrganizeCommand {
       this.refreshTranslationFiles();
 
     } catch (error) {
-      panel.webview.postMessage({
-        command: 'organizeTargetResult',
-        success: false,
-        message: `整理目标文件失败: ${error}`
-      });
+      this.sendErrorMessage(panel, 'organizeTargetResult', `整理目标文件失败: ${error}`);
     }
   }
 
@@ -1539,6 +1583,191 @@ export class BatchTranslateOrganizeCommand {
         success: false,
         message: `获取清理备份文件列表失败: ${error}`
       });
+    }
+  }
+
+  /**
+   * 处理手动备份源文件命令
+   * @param panel WebView 面板实例
+   */
+  private async handleBackupSource(panel: vscode.WebviewPanel) {
+    try {
+      // 获取配置和工作区路径
+      const config = this.getConfig();
+      const workspacePath = this.getWorkspacePath();
+      const sourceFilePath = path.join(workspacePath, config.translatePath, config.sourceFile);
+
+      if (!fs.existsSync(sourceFilePath)) {
+        panel.webview.postMessage({
+          command: 'backupSourceResult',
+          success: false,
+          message: `源文件不存在: ${config.sourceFile}`
+        });
+        return;
+      }
+
+      // 读取源文件内容
+      const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
+
+      // 创建备份文件夹
+      const backupDir = path.join(workspacePath, config.translatePath, 'backups');
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      // 生成备份文件名
+      const timestamp = this.generateTimestamp();
+      const backupFileName = `${path.basename(config.sourceFile, path.extname(config.sourceFile))}_${timestamp}.backup`;
+      const backupPath = path.join(backupDir, backupFileName);
+
+      // 备份源文件
+      fs.writeFileSync(backupPath, sourceContent, 'utf-8');
+
+      // 发送备份结果
+      panel.webview.postMessage({
+        command: 'backupSourceResult',
+        success: true,
+        backupFile: backupFileName,
+        sourceFile: config.sourceFile,
+        message: `源文件备份成功: ${backupFileName}`
+      });
+
+      // 刷新翻译文件列表
+      this.refreshTranslationFiles();
+
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'backupSourceResult',
+        success: false,
+        message: `备份源文件失败: ${error}`
+      });
+    }
+  }
+
+  /**
+   * 处理手动备份目标文件命令
+   * @param panel WebView 面板实例
+   */
+  private async handleBackupTarget(panel: vscode.WebviewPanel) {
+    try {
+      // 获取配置和工作区路径
+      const config = this.getConfig();
+      const workspacePath = this.getWorkspacePath();
+      const baseDir = path.join(workspacePath, config.translatePath);
+
+      // 获取目标文件列表
+      const targetFiles = this.getTargetFiles(baseDir, config.sourceFile, config.execFile);
+      const results: any[] = [];
+
+      // 创建备份文件夹
+      const backupDir = path.join(baseDir, 'backups');
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      // 备份每个目标文件
+      for (const targetFileName of targetFiles) {
+        const targetFilePath = path.join(baseDir, targetFileName);
+        if (!fs.existsSync(targetFilePath)) {
+          continue;
+        }
+
+        try {
+          const targetContent = fs.readFileSync(targetFilePath, 'utf-8');
+
+          // 生成备份文件名
+          const timestamp = this.generateTimestamp();
+          const backupFileName = `${path.basename(targetFileName, path.extname(targetFileName))}_${timestamp}.backup`;
+          const backupPath = path.join(backupDir, backupFileName);
+
+          // 备份目标文件
+          fs.writeFileSync(backupPath, targetContent, 'utf-8');
+
+          results.push({
+            name: targetFileName,
+            status: '已备份',
+            backupFile: backupFileName
+          });
+
+        } catch (error) {
+          results.push({
+            name: targetFileName,
+            status: '备份失败',
+            error: String(error)
+          });
+        }
+      }
+
+      // 发送备份结果
+      panel.webview.postMessage({
+        command: 'backupTargetResult',
+        success: true,
+        results: results,
+        message: `共备份了 ${results.filter(r => r.status === '已备份').length} 个目标文件`
+      });
+
+      // 刷新翻译文件列表
+      this.refreshTranslationFiles();
+
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'backupTargetResult',
+        success: false,
+        message: `备份目标文件失败: ${error}`
+      });
+    }
+  }
+
+  /**
+ * 获取文件中的所有键值对（包括嵌套键）
+ * @param content 文件内容
+ * @returns 键值对数组
+ */
+  private getAllKeyValues(content: string): Array<{ key: string, value: string }> {
+    try {
+      // 解析文件内容 - 处理 export default 语法
+      let cleanContent = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+      // 如果包含 export default，提取对象部分
+      if (cleanContent.includes('export default')) {
+        const match = cleanContent.match(/export\s+default\s*(\{[\s\S]*\})/);
+        if (match) {
+          cleanContent = match[1];
+        }
+      }
+
+
+
+      const parsed = new Function('return (' + cleanContent + ')')();
+
+      const keyValues: Array<{ key: string, value: string }> = [];
+
+      // 递归获取所有键值对
+      const extractKeyValues = (obj: any, prefix: string = '') => {
+        if (typeof obj === 'object' && obj !== null) {
+          for (const key in obj) {
+            const fullKey = prefix ? `${prefix}.${key}` : key;
+            if (typeof obj[key] === 'string') {
+              // 只保存字符串类型的值（翻译文本）
+              keyValues.push({
+                key: fullKey,
+                value: obj[key]
+              });
+            } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+              // 递归处理嵌套对象
+              extractKeyValues(obj[key], fullKey);
+            }
+          }
+        }
+      };
+
+      extractKeyValues(parsed);
+
+      return keyValues;
+    } catch (error) {
+      console.error('获取键值对失败:', error);
+      console.error('文件内容前200字符:', content.substring(0, 200));
+      return [];
     }
   }
 } 

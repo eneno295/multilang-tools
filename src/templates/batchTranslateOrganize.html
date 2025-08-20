@@ -204,6 +204,8 @@
       color: var(--vscode-notificationsWarningIcon-foreground);
     }
 
+
+
     /* Source info: 3-column brief stats */
     .source-brief-stats {
       display: grid;
@@ -424,6 +426,39 @@
       justify-content: center;
       gap: 12px;
     }
+
+
+
+
+
+    /* 键详情样式 */
+    .key-details {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+
+    .key-details-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: var(--vscode-textLink-foreground);
+    }
+
+    .key-details-content {
+      font-family: monospace;
+      background: var(--vscode-textBlockQuote-background);
+      padding: 8px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-size: 12px;
+      line-height: 1.4;
+      max-height: 300px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
   </style>
 </head>
 
@@ -444,6 +479,7 @@
         <div>
           <button id="organizeSourceBtn" class="btn">整理源文件</button>
           <div class="secondary-buttons">
+            <button id="backupSourceBtn" class="btn secondary">备份</button>
             <button id="restoreSourceBtn" class="btn secondary">还原</button>
             <button id="cleanBackupSourceBtn" class="btn secondary">清理</button>
           </div>
@@ -451,6 +487,7 @@
         <div>
           <button id="organizeTargetBtn" class="btn">整理目标文件</button>
           <div class="secondary-buttons">
+            <button id="backupTargetBtn" class="btn secondary">备份</button>
             <button id="restoreTargetBtn" class="btn secondary">还原</button>
             <button id="cleanBackupTargetBtn" class="btn secondary">清理</button>
           </div>
@@ -467,6 +504,8 @@
       <strong style="display: block; margin-bottom: 10px;" id="resultsTitle">操作结果：</strong>
       <div id="resultsList"></div>
     </div>
+
+
 
     <div id="loadingSection" class="loading" style="display: none;">正在分析文件结构，请稍候...</div>
     <div id="errorSection" class="error" style="display: none;"></div>
@@ -521,6 +560,8 @@
         </div>
       </div>
     </div>
+
+
   </div>
 
   <script>
@@ -528,6 +569,8 @@
 
     document.getElementById('organizeSourceBtn').addEventListener('click', () => { showLoading(); hideError(); vscode.postMessage({ command: 'organizeSource' }); });
     document.getElementById('organizeTargetBtn').addEventListener('click', () => { showLoading(); hideError(); vscode.postMessage({ command: 'organizeTarget' }); });
+    document.getElementById('backupSourceBtn').addEventListener('click', () => { showLoading(); hideError(); vscode.postMessage({ command: 'backupSource' }); });
+    document.getElementById('backupTargetBtn').addEventListener('click', () => { showLoading(); hideError(); vscode.postMessage({ command: 'backupTarget' }); });
     document.getElementById('restoreSourceBtn').addEventListener('click', () => { showBackupSelector('source'); });
     document.getElementById('restoreTargetBtn').addEventListener('click', () => { showBackupSelector('target'); });
     document.getElementById('cleanBackupSourceBtn').addEventListener('click', () => { showCleanBackupSelector('source'); });
@@ -582,6 +625,18 @@
             <div class="stat-label">多余键数</div>
           </div>
         </div>
+        ${stats.missingKeys > 0 ? `
+          <div class="key-details">
+            <div class="key-details-title">缺失的键：</div>
+            <div class="key-details-content">${getMissingKeysList(stats)}</div>
+          </div>
+        ` : ''}
+        ${stats.redundantKeys > 0 ? `
+          <div class="key-details">
+            <div class="key-details-title">多余的键：</div>
+            <div class="key-details-content">${getRedundantKeysList(stats)}</div>
+          </div>
+        ` : ''}
       `;
     }
 
@@ -601,8 +656,7 @@
     // 渲染文件列表和源文件信息
     function renderTargets(files, sourceInfo) {
       // 调试信息
-      console.log('renderTargets - files:', files);
-      console.log('renderTargets - sourceInfo:', sourceInfo);
+
 
       // 显示文件信息
       if (files.length > 0) {
@@ -616,12 +670,12 @@
 
       // 总是显示源文件信息，如果没有则从files中获取
       if (sourceInfo) {
-        console.log('Using sourceInfo from parameter');
+
         showSourceInfo({ sourceInfo });
       } else if (files.length > 0) {
         const sourceFileInfo = files.find(f => f.isSource);
         if (sourceFileInfo) {
-          console.log('Using sourceFileInfo from files array');
+
           showSourceInfo({ sourceInfo: sourceFileInfo });
         }
       }
@@ -662,6 +716,7 @@
         }
 
         const stats = {
+          fileName: data.sourceInfo?.name || '源文件',
           originalLines: data.originalLines,
           formattedLines: data.formattedLines,
           originalKeys: data.originalKeys,
@@ -684,12 +739,15 @@
         data.results.forEach(r => {
           if (r.status === '已整理') {
             const stats = {
+              fileName: r.name,
               originalLines: r.originalLines,
               organizedLines: r.organizedLines,
               originalKeys: r.originalKeys,
               organizedKeys: r.organizedKeys,
               missingKeys: r.missingKeys || 0,
-              redundantKeys: r.redundantKeys || 0
+              redundantKeys: r.redundantKeys || 0,
+              missingKeyList: r.missingKeyList || [],
+              redundantKeyList: r.redundantKeyList || []
             };
 
             content += createResultCardHeader(r.name, r.status, 'success') +
@@ -780,6 +838,27 @@
       }
     }
 
+    // 显示备份结果
+    function showBackupResults(data, type = '') {
+      let content = '';
+
+      if (data.results) {
+        // 目标文件备份结果（多个文件）
+        data.results.forEach(r => {
+          const statusClass = r.status === '已备份' ? 'success' : 'error';
+          content += createResultCardHeader(r.name, r.status, statusClass) +
+            `${r.backupFile ? `<div style="padding: 10px; color: var(--vscode-descriptionForeground);">备份文件: ${r.backupFile}</div>` : ''}` +
+            `${r.error ? `<div style="padding: 10px; color: var(--vscode-notificationsErrorIcon-foreground);">${r.error}</div>` : ''}</div>`;
+        });
+      } else {
+        // 源文件备份结果（单个文件）
+        content = createResultCardHeader(data.sourceFile || '源文件', '已备份', 'success') +
+          `${data.backupFile ? `<div style="padding: 10px; color: var(--vscode-descriptionForeground);">备份文件: ${data.backupFile}</div>` : ''}</div>`;
+      }
+
+      showResults(`${type}备份结果：`, content);
+    }
+
     // 显示备份文件选择器
     function showBackupSelector(type) {
       hideError();
@@ -852,6 +931,28 @@
     // 隐藏确认对话框
     function hideConfirmDialog() {
       document.getElementById('confirmDialog').style.display = 'none';
+    }
+
+    // 获取缺失键值对列表
+    function getMissingKeysList(stats) {
+      if (stats.missingKeys === 0) return '';
+
+      if (stats.missingKeyList && stats.missingKeyList.length > 0) {
+        return stats.missingKeyList.map(item => `${item.key}: "${item.value}"`).join('\n');
+      }
+
+      return `缺失 ${stats.missingKeys} 个键`;
+    }
+
+    // 获取多余键值对列表
+    function getRedundantKeysList(stats) {
+      if (stats.redundantKeys === 0) return '';
+
+      if (stats.redundantKeyList && stats.redundantKeyList.length > 0) {
+        return stats.redundantKeyList.map(item => `${item.key}: "${item.value}"`).join('\n');
+      }
+
+      return `多余 ${stats.redundantKeys} 个键`;
     }
 
     // 格式化备份时间戳
@@ -947,6 +1048,12 @@
           break;
         case 'cleanBackupTargetResult':
           m.success ? showCleanBackupResults(m, '目标文件') : (hideLoading(), showError(m.message || '清理目标文件备份失败'));
+          break;
+        case 'backupSourceResult':
+          m.success ? showBackupResults(m, '源文件') : (hideLoading(), showError(m.message || '备份源文件失败'));
+          break;
+        case 'backupTargetResult':
+          m.success ? showBackupResults(m, '目标文件') : (hideLoading(), showError(m.message || '备份目标文件失败'));
           break;
         case 'backupListResult':
           m.success ? showBackupList(m) : showError(m.message || '获取备份列表失败');
