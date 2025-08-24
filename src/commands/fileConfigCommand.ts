@@ -108,14 +108,11 @@ export class FileConfigCommand {
 
   private async handleSaveConfig(config: any, panel: vscode.WebviewPanel) {
     try {
-      console.log('保存配置:', config);
       const vscodeConfig = vscode.workspace.getConfiguration('multilang-tools');
 
       await vscodeConfig.update(`${this.options.prefix}Path`, config.dir, vscode.ConfigurationTarget.Workspace);
       await vscodeConfig.update(`${this.options.prefix}SourceFile`, config.sourceFile, vscode.ConfigurationTarget.Workspace);
       await vscodeConfig.update(`${this.options.prefix}ExecFile`, config.execFile, vscode.ConfigurationTarget.Workspace);
-
-      console.log('配置保存成功');
 
       // 保存成功后通知前端显示成功提示并清除其他提示
       panel.webview.postMessage({

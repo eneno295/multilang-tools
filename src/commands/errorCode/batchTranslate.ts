@@ -251,8 +251,6 @@ export class BatchTranslateCommand {
 
   private async handleStartTranslate(panel: vscode.WebviewPanel) {
     try {
-      console.log('开始批量翻译');
-
       const config = vscode.workspace.getConfiguration('multilang-tools');
       const dirPath = config.get('errorCodePath', 'public/errCode');
       const sourceFile = config.get('errorCodeSourceFile', 'zh-CN.js');

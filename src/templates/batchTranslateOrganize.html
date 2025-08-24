@@ -19,14 +19,12 @@
       margin: 0 auto;
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    .header h1 {
-      color: var(--vscode-textLink-foreground);
-      margin-bottom: 10px;
+    /* 标题样式 */
+    h2 {
+      color: var(--vscode-editor-foreground);
+      border-bottom: 2px solid var(--vscode-focusBorder);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
     }
 
     .description {
@@ -45,7 +43,6 @@
     .button-group {
       display: flex;
       gap: 16px;
-      margin-bottom: 16px;
     }
 
     .button-group>div {
@@ -251,13 +248,12 @@
     }
 
     .file-info {
-      margin-bottom: 16px;
-      padding: 12px;
-      background: var(--vscode-editor-background);
+      margin: 20px 0;
+      padding: 15px;
+      background-color: var(--vscode-editor-background);
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
-      font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     /* 备份文件选择器样式 */
@@ -464,10 +460,7 @@
 
 <body>
   <div class="container">
-    <div class="header">
-      <h1>批量翻译工具 - 文件整理</h1>
-      <div class="description">整理源文件和目标文件，支持备份和还原功能</div>
-    </div>
+    <h2>批量翻译工具 - 文件整理</h2>
 
     <div id="fileInfo" class="file-info" style="display: none;">
       <strong>源文件: </strong><span id="sourceFileName"></span>,

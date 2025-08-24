@@ -92,6 +92,11 @@
         "category": "多语言工具"
       },
       {
+        "command": "multilang-tools.batchTranslateTranslate",
+        "title": "批量翻译",
+        "category": "多语言工具"
+      },
+      {
         "command": "multilang-tools.refreshNumberCodeFiles",
         "title": "刷新错误码文件",
         "category": "多语言工具"
@@ -154,8 +159,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && npm run copy-templates",
-    "copy-templates": "cp -r src/templates out/",
+    "compile": "tsc -p ./ && npm run copy-resources",
+    "copy-resources": "cp -r src/templates out/ && cp -r resources out/",
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
     "publish": "vsce publish"

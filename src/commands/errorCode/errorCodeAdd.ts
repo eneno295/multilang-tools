@@ -76,8 +76,6 @@ export class ErrorCodeAddCommand {
 
   private async handleAddErrorCodes(errorCodes: Array<{ code: string, message: string }>) {
     try {
-      console.log('添加错误码数据:', errorCodes);
-
       // 获取源文件路径
       const sourceFilePath = this.getSourceFilePath();
 

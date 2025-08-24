@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ErrorCodeConfigCommand } from './commands/errorCode/errorCodeConfig';
 import { ErrorCodeAddCommand } from './commands/errorCode/errorCodeAdd';
 import { BatchTranslateCommand } from './commands/errorCode/batchTranslate';
+import { BatchTranslateTranslateCommand } from './commands/translate/batchTranslate';
 import { FileOrganizeCommand } from './commands/errorCode/fileOrganize';
 import { BatchTranslateConfigCommand } from './commands/translate/batchTranslateConfig';
 import { BatchTranslateOrganizeCommand } from './commands/translate/batchTranslateOrganize';
@@ -18,6 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
   const fileOrganize = new FileOrganizeCommand();
   const batchTranslateConfig = new BatchTranslateConfigCommand();
   const batchTranslateOrganize = new BatchTranslateOrganizeCommand();
+  const batchTranslateTranslate = new BatchTranslateTranslateCommand(context);
 
   // 创建错误码管理器提供者
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -38,17 +40,27 @@ export function activate(context: vscode.ExtensionContext) {
   // 设置为全局变量，供其他命令访问
   (globalThis as any).multilangBatchTranslateProvider = batchTranslateManagerProvider;
 
-  // 监听文件保存事件，自动刷新错误码文件列表
+  // 监听文件保存事件，自动刷新文件列表
   const fileSaveListener = vscode.workspace.onDidSaveTextDocument((document) => {
-    // 检查是否是错误码文件
     const config = vscode.workspace.getConfiguration('multilang-tools');
-    const errorCodePath = config.get('errorCodePath', 'public/errCode');
 
+    // 检查是否是错误码文件
+    const errorCodePath = config.get('errorCodePath', 'public/errCode');
     if (document.fileName.includes(errorCodePath) && document.fileName.endsWith('.js')) {
       console.log('检测到错误码文件保存:', document.fileName);
       // 延迟刷新，确保文件写入完成
       setTimeout(() => {
         errorCodeManagerProvider.refresh();
+        batchTranslateManagerProvider.refresh();
+      }, 100);
+    }
+
+    // 检查是否是翻译文件
+    const translatePath = config.get('translatePath', 'src/lang/locales');
+    if (document.fileName.includes(translatePath) && document.fileName.endsWith('.ts')) {
+      console.log('检测到翻译文件保存:', document.fileName);
+      // 延迟刷新，确保文件写入完成
+      setTimeout(() => {
         batchTranslateManagerProvider.refresh();
       }, 100);
     }
@@ -86,6 +98,10 @@ export function activate(context: vscode.ExtensionContext) {
     batchTranslateOrganize.execute();
   });
 
+  const batchTranslateTranslateCommand = vscode.commands.registerCommand('multilang-tools.batchTranslateTranslate', () => {
+    batchTranslateTranslate.execute();
+  });
+
   // 刷新错误码文件列表
   const refreshNumberCodeFilesCommand = vscode.commands.registerCommand('multilang-tools.refreshNumberCodeFiles', () => {
     try {
@@ -115,6 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
     batchConfigPathCommand,
     batchTranslateCommand,
     batchOrganizeFileCommand,
+    batchTranslateTranslateCommand,
     refreshNumberCodeFilesCommand,
     refreshTranslationFilesCommand,
     fileSaveListener

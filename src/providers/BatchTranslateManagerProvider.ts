@@ -77,7 +77,7 @@ export class BatchTranslateManagerProvider implements vscode.TreeDataProvider<Ba
     // 返回根级别的项目：按钮 + 翻译文件根节点
     const items: (BatchTranslateButton | TranslationFilesRoot)[] = [
       new BatchTranslateButton('文件路径配置', 'multilang-tools.batchConfigPath', vscode.TreeItemCollapsibleState.None),
-      new BatchTranslateButton('批量翻译', 'multilang-tools.batchTranslate', vscode.TreeItemCollapsibleState.None),
+      new BatchTranslateButton('批量翻译', 'multilang-tools.batchTranslateTranslate', vscode.TreeItemCollapsibleState.None),
       new BatchTranslateButton('整理文件', 'multilang-tools.batchOrganizeFile', vscode.TreeItemCollapsibleState.None),
       new TranslationFilesRoot()
     ];
@@ -98,8 +98,6 @@ export class BatchTranslateManagerProvider implements vscode.TreeDataProvider<Ba
       const config = vscode.workspace.getConfiguration('multilang-tools');
       const dirPath = config.get('translatePath', 'src/lang/locales');
       const fullPath = path.join(this.workspaceRoot, dirPath);
-
-      console.log('BatchTranslateManagerProvider: 翻译文件目录路径:', fullPath);
 
       if (!fs.existsSync(fullPath)) {
         console.log('BatchTranslateManagerProvider: 目录不存在:', fullPath);
@@ -140,9 +138,6 @@ export class BatchTranslateManagerProvider implements vscode.TreeDataProvider<Ba
 
       // 按文件名排序
       files.sort((a, b) => a.fileName.localeCompare(b.fileName));
-
-      console.log('BatchTranslateManagerProvider: 找到的翻译文件:', files.map(f => `${f.fileName} (${f.tooltip})`));
-
     } catch (error) {
       console.error('获取翻译文件列表失败:', error);
     }
