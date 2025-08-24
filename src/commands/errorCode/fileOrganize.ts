@@ -15,7 +15,7 @@ export class FileOrganizeCommand {
 
     const panel = vscode.window.createWebviewPanel(
       'fileOrganize',
-      '整理文件',
+      '错误码-整理文件',
       vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -60,6 +60,30 @@ export class FileOrganizeCommand {
           case 'organizeTargetFiles':
             await this.handleOrganizeTargetFiles(panel);
             break;
+          case 'backupSource':
+            await this.handleBackupSource(panel);
+            break;
+          case 'backupTarget':
+            await this.handleBackupTarget(panel);
+            break;
+          case 'restoreSource':
+            await this.handleRestoreSource(panel, message.backupFile);
+            break;
+          case 'restoreTarget':
+            await this.handleRestoreTarget(panel, message.backupFile);
+            break;
+          case 'cleanBackupSource':
+            await this.handleCleanBackupSource(panel, message.backupFile);
+            break;
+          case 'cleanBackupTarget':
+            await this.handleCleanBackupTarget(panel, message.backupFile);
+            break;
+          case 'getBackupList':
+            await this.handleGetBackupList(panel, message.type);
+            break;
+          case 'getCleanBackupList':
+            await this.handleGetCleanBackupList(panel, message.type);
+            break;
         }
       }
     );
@@ -95,11 +119,31 @@ export class FileOrganizeCommand {
       // 获取目标文件列表
       const targetFiles = this.getTargetFiles(sourceDir, sourceFile, execFile);
 
+      // 获取源文件信息
+      let sourceInfo = null;
+      const sourceFilePath = path.join(sourceDir, sourceFile);
+      if (fs.existsSync(sourceFilePath)) {
+        try {
+          const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
+          const sourceKeys = this.countKeys(sourceContent);
+          const sourceLines = sourceContent.split('\n').length;
+
+          sourceInfo = {
+            name: sourceFile,
+            lines: sourceLines,
+            keys: sourceKeys
+          };
+        } catch (error) {
+          console.error(`读取源文件失败: ${error}`);
+        }
+      }
+
       panel.webview.postMessage({
         command: 'fileInfoResult',
         success: true,
         sourceFile: sourceFile,
-        files: targetFiles
+        files: targetFiles,
+        sourceInfo: sourceInfo
       });
     } catch (error) {
       panel.webview.postMessage({
@@ -138,6 +182,24 @@ export class FileOrganizeCommand {
         return;
       }
 
+      // 检查是否需要创建备份
+      const backupDir = path.join(sourceDir, 'backups', 'source');
+      let backupCreated = false;
+
+      if (!fs.existsSync(backupDir) || fs.readdirSync(backupDir).length === 0) {
+        // 没有备份，创建备份
+        if (!fs.existsSync(backupDir)) {
+          fs.mkdirSync(backupDir, { recursive: true });
+        }
+
+        const timestamp = this.generateTimestamp();
+        const backupFileName = `${path.basename(sourceFile, path.extname(sourceFile))}_${timestamp}.backup`;
+        const backupPath = path.join(backupDir, backupFileName);
+
+        fs.copyFileSync(sourceFilePath, backupPath);
+        backupCreated = true;
+      }
+
       // 读取源文件内容
       const content = fs.readFileSync(sourceFilePath, 'utf8');
       const organizedContent = this.organizeFileContent(content);
@@ -145,10 +207,14 @@ export class FileOrganizeCommand {
       // 写回文件
       fs.writeFileSync(sourceFilePath, organizedContent, 'utf8');
 
+      const message = backupCreated
+        ? `源文件整理完成，已自动创建备份`
+        : `源文件整理完成，已有备份无需创建`;
+
       panel.webview.postMessage({
         command: 'organizeResult',
         success: true,
-        message: `源文件整理完成`,
+        message: message,
         file: sourceFile,
         type: 'source'
       });
@@ -186,6 +252,43 @@ export class FileOrganizeCommand {
       const sourceInfo = this.getFileInfo(sourceContent);
 
       const targetFiles = this.getTargetFiles(sourceDir, sourceFile, execFile);
+
+      // 检查每个目标文件是否都有备份
+      const backupDir = path.join(sourceDir, 'backups', 'target');
+      let backupCreated = false;
+      const filesNeedingBackup: string[] = [];
+
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      // 检查每个目标文件是否都有对应的备份
+      for (const targetFile of targetFiles) {
+        if (fs.existsSync(targetFile.path)) {
+          const targetFileName = path.basename(targetFile.name, path.extname(targetFile.name));
+          const existingBackups = fs.readdirSync(backupDir)
+            .filter(file => file.startsWith(targetFileName) && file.endsWith('.backup'));
+
+          if (existingBackups.length === 0) {
+            // 这个文件没有备份，需要创建
+            filesNeedingBackup.push(targetFile.name);
+          }
+        }
+      }
+
+      // 为没有备份的文件创建备份
+      if (filesNeedingBackup.length > 0) {
+        const timestamp = this.generateTimestamp();
+        for (const fileName of filesNeedingBackup) {
+          const targetFile = targetFiles.find(tf => tf.name === fileName);
+          if (targetFile && fs.existsSync(targetFile.path)) {
+            const backupFileName = `${path.basename(fileName, path.extname(fileName))}_${timestamp}.backup`;
+            const backupPath = path.join(backupDir, backupFileName);
+            fs.copyFileSync(targetFile.path, backupPath);
+          }
+        }
+        backupCreated = true;
+      }
       const results: Array<{
         file: string,
         success: boolean,
@@ -244,10 +347,21 @@ export class FileOrganizeCommand {
         }
       }
 
+      let message: string;
+      if (backupCreated) {
+        if (filesNeedingBackup.length === targetFiles.length) {
+          message = '目标文件整理完成，已为所有文件创建备份';
+        } else {
+          message = `目标文件整理完成，已为 ${filesNeedingBackup.length} 个文件创建备份`;
+        }
+      } else {
+        message = '目标文件整理完成，所有文件已有备份无需创建';
+      }
+
       panel.webview.postMessage({
         command: 'organizeResult',
         success: true,
-        message: `目标文件整理完成`,
+        message: message,
         sourceInfo: {
           file: sourceFile,
           lines: sourceInfo.lines,
@@ -671,6 +785,21 @@ export class FileOrganizeCommand {
     return result.join('\n');
   }
 
+  private countKeys(content: string): number {
+    const lines = content.split('\n');
+    let count = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const match = trimmed.match(/^["']([^"']+)["']\s*:\s*["']/);
+      if (match) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
   private getFileInfo(content: string): { lines: number, keys: string[] } {
     const lines = content.split('\n');
     const keys: string[] = [];
@@ -695,5 +824,560 @@ export class FileOrganizeCommand {
 
   private calculateRedundantKeys(sourceKeys: string[], targetKeys: string[]): number {
     return targetKeys.filter(key => !sourceKeys.includes(key)).length;
+  }
+
+  // 备份相关方法
+  private async handleBackupSource(panel: vscode.WebviewPanel) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+      const sourceFile = config.get<string>('errorCodeSourceFile', 'zh-CN.js');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'backupSourceResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const sourceFilePath = path.join(sourceDir, sourceFile);
+      const backupDir = path.join(sourceDir, 'backups', 'source');
+
+      if (!fs.existsSync(sourceFilePath)) {
+        panel.webview.postMessage({
+          command: 'backupSourceResult',
+          success: false,
+          message: '源文件不存在'
+        });
+        return;
+      }
+
+      // 创建备份目录
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      // 生成备份文件名
+      const timestamp = this.generateTimestamp();
+      const backupFileName = `${path.basename(sourceFile, path.extname(sourceFile))}_${timestamp}.backup`;
+      const backupPath = path.join(backupDir, backupFileName);
+
+      // 复制文件
+      fs.copyFileSync(sourceFilePath, backupPath);
+
+      panel.webview.postMessage({
+        command: 'backupSourceResult',
+        success: true,
+        message: '源文件备份成功',
+        backupFile: backupFileName,
+        sourceFile: sourceFile
+      });
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'backupSourceResult',
+        success: false,
+        message: `备份源文件失败: ${error}`
+      });
+    }
+  }
+
+  private async handleBackupTarget(panel: vscode.WebviewPanel) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+      const execFile = config.get<string>('errorCodeExecFile', 'all');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'backupTargetResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const backupDir = path.join(sourceDir, 'backups', 'target');
+      const targetFiles = this.getTargetFiles(sourceDir, 'zh-CN.js', execFile);
+
+      // 创建备份目录
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      const results = [];
+      for (const targetFile of targetFiles) {
+        const targetFilePath = path.join(sourceDir, targetFile.name);
+        if (fs.existsSync(targetFilePath)) {
+          const timestamp = this.generateTimestamp();
+          const backupFileName = `${path.basename(targetFile.name, path.extname(targetFile.name))}_${timestamp}.backup`;
+          const backupPath = path.join(backupDir, backupFileName);
+
+          fs.copyFileSync(targetFilePath, backupPath);
+          results.push({
+            name: targetFile.name,
+            status: '已备份',
+            backupFile: backupFileName
+          });
+        } else {
+          results.push({
+            name: targetFile.name,
+            status: '文件不存在',
+            error: '目标文件不存在'
+          });
+        }
+      }
+
+      panel.webview.postMessage({
+        command: 'backupTargetResult',
+        success: true,
+        message: '目标文件备份完成',
+        results: results
+      });
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'backupTargetResult',
+        success: false,
+        message: `备份目标文件失败: ${error}`
+      });
+    }
+  }
+
+  private async handleRestoreSource(panel: vscode.WebviewPanel, backupFile: string) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+      const sourceFile = config.get<string>('errorCodeSourceFile', 'zh-CN.js');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'restoreSourceResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const sourceFilePath = path.join(sourceDir, sourceFile);
+      const backupPath = path.join(sourceDir, 'backups', 'source', backupFile);
+
+      if (!fs.existsSync(backupPath)) {
+        panel.webview.postMessage({
+          command: 'restoreSourceResult',
+          success: false,
+          message: '备份文件不存在'
+        });
+        return;
+      }
+
+      fs.copyFileSync(backupPath, sourceFilePath);
+
+      panel.webview.postMessage({
+        command: 'restoreSourceResult',
+        success: true,
+        message: '源文件还原成功',
+        backupFile: backupFile,
+        sourceFile: sourceFile
+      });
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'restoreSourceResult',
+        success: false,
+        message: `还原源文件失败: ${error}`
+      });
+    }
+  }
+
+  private async handleRestoreTarget(panel: vscode.WebviewPanel, backupFile: string) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+      const execFile = config.get<string>('errorCodeExecFile', 'all');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'restoreTargetResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const backupPath = path.join(sourceDir, 'backups', 'target', backupFile);
+      const targetFiles = this.getTargetFiles(sourceDir, 'zh-CN.js', execFile);
+
+      const results = [];
+      for (const targetFile of targetFiles) {
+        const targetFilePath = path.join(sourceDir, targetFile.name);
+        if (fs.existsSync(backupPath)) {
+          try {
+            fs.copyFileSync(backupPath, targetFilePath);
+            results.push({
+              name: targetFile.name,
+              status: '已还原',
+              backupFile: backupFile
+            });
+          } catch (error) {
+            results.push({
+              name: targetFile.name,
+              status: '还原失败',
+              error: `还原失败: ${error}`
+            });
+          }
+        } else {
+          results.push({
+            name: targetFile.name,
+            status: '无备份文件',
+            error: '该文件没有备份，无法还原'
+          });
+        }
+      }
+
+      panel.webview.postMessage({
+        command: 'restoreTargetResult',
+        success: true,
+        message: '目标文件还原完成',
+        results: results
+      });
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'restoreTargetResult',
+        success: false,
+        message: `还原目标文件失败: ${error}`
+      });
+    }
+  }
+
+  private async handleCleanBackupSource(panel: vscode.WebviewPanel, backupFile?: string) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'cleanBackupSourceResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const backupDir = path.join(sourceDir, 'backups', 'source');
+
+      if (!fs.existsSync(backupDir)) {
+        panel.webview.postMessage({
+          command: 'cleanBackupSourceResult',
+          success: true,
+          message: '没有备份文件需要清理',
+          results: []
+        });
+        return;
+      }
+
+      if (backupFile) {
+        // 清理单个备份文件
+        const backupPath = path.join(backupDir, backupFile);
+        if (fs.existsSync(backupPath)) {
+          fs.unlinkSync(backupPath);
+          panel.webview.postMessage({
+            command: 'cleanBackupSourceResult',
+            success: true,
+            message: '源文件备份清理成功',
+            results: [{
+              name: backupFile,
+              status: '已删除'
+            }]
+          });
+        } else {
+          panel.webview.postMessage({
+            command: 'cleanBackupSourceResult',
+            success: false,
+            message: '备份文件不存在',
+            results: [{
+              name: backupFile,
+              status: '文件不存在',
+              error: '备份文件不存在'
+            }]
+          });
+        }
+      } else {
+        // 清理所有备份文件
+        const files = fs.readdirSync(backupDir);
+        const results = [];
+
+        for (const file of files) {
+          try {
+            const filePath = path.join(backupDir, file);
+            fs.unlinkSync(filePath);
+            results.push({
+              name: file,
+              status: '已删除'
+            });
+          } catch (error) {
+            results.push({
+              name: file,
+              status: '删除失败',
+              error: `删除失败: ${error}`
+            });
+          }
+        }
+
+        panel.webview.postMessage({
+          command: 'cleanBackupSourceResult',
+          success: true,
+          message: '所有源文件备份清理完成',
+          results: results
+        });
+      }
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'cleanBackupSourceResult',
+        success: false,
+        message: `清理源文件备份失败: ${error}`,
+        results: []
+      });
+    }
+  }
+
+  private async handleCleanBackupTarget(panel: vscode.WebviewPanel, backupFile?: string) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'cleanBackupTargetResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const backupDir = path.join(sourceDir, 'backups', 'target');
+
+      if (!fs.existsSync(backupDir)) {
+        panel.webview.postMessage({
+          command: 'cleanBackupTargetResult',
+          success: true,
+          message: '没有备份文件需要清理',
+          results: []
+        });
+        return;
+      }
+
+      if (backupFile) {
+        // 清理单个备份文件
+        const backupPath = path.join(backupDir, backupFile);
+        if (fs.existsSync(backupPath)) {
+          fs.unlinkSync(backupPath);
+          panel.webview.postMessage({
+            command: 'cleanBackupTargetResult',
+            success: true,
+            message: '目标文件备份清理成功',
+            results: [{
+              name: backupFile,
+              status: '已删除'
+            }]
+          });
+        } else {
+          panel.webview.postMessage({
+            command: 'cleanBackupTargetResult',
+            success: false,
+            message: '备份文件不存在',
+            results: [{
+              name: backupFile,
+              status: '文件不存在',
+              error: '备份文件不存在'
+            }]
+          });
+        }
+      } else {
+        // 清理所有备份文件
+        const files = fs.readdirSync(backupDir);
+        const results = [];
+
+        for (const file of files) {
+          try {
+            const filePath = path.join(backupDir, file);
+            fs.unlinkSync(filePath);
+            results.push({
+              name: file,
+              status: '已删除'
+            });
+          } catch (error) {
+            results.push({
+              name: file,
+              status: '删除失败',
+              error: `删除失败: ${error}`
+            });
+          }
+        }
+
+        panel.webview.postMessage({
+          command: 'cleanBackupTargetResult',
+          success: true,
+          message: '所有目标文件备份清理完成',
+          results: results
+        });
+      }
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'cleanBackupTargetResult',
+        success: false,
+        message: `清理目标文件备份失败: ${error}`,
+        results: []
+      });
+    }
+  }
+
+  private async handleGetBackupList(panel: vscode.WebviewPanel, type: string) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'backupListResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const backupDir = path.join(sourceDir, 'backups', type);
+
+      if (!fs.existsSync(backupDir)) {
+        panel.webview.postMessage({
+          command: 'backupListResult',
+          success: true,
+          backupList: [],
+          type: type
+        });
+        return;
+      }
+
+      const files = fs.readdirSync(backupDir);
+      const backupFiles: Array<{ fileName: string, displayName: string, timestamp: string }> = [];
+
+      files.forEach(file => {
+        const match = file.match(/(.+)_(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})\.backup$/);
+        if (match) {
+          const [, fileName, timestamp] = match;
+          backupFiles.push({
+            fileName: file,
+            displayName: `${fileName} (${this.formatTimestamp(timestamp)})`,
+            timestamp: this.formatTimestamp(timestamp)
+          });
+        }
+      });
+
+      panel.webview.postMessage({
+        command: 'backupListResult',
+        success: true,
+        backupList: backupFiles.sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
+        type: type
+      });
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'backupListResult',
+        success: false,
+        message: `获取备份列表失败: ${error}`
+      });
+    }
+  }
+
+  private async handleGetCleanBackupList(panel: vscode.WebviewPanel, type: string) {
+    try {
+      const config = vscode.workspace.getConfiguration('multilang-tools');
+      const dirPath = config.get<string>('errorCodePath', 'public/errCode');
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        panel.webview.postMessage({
+          command: 'cleanBackupListResult',
+          success: false,
+          message: '无法获取工作区路径'
+        });
+        return;
+      }
+
+      const sourceDir = path.join(workspaceRoot, dirPath);
+      const backupDir = path.join(sourceDir, 'backups', type);
+
+      if (!fs.existsSync(backupDir)) {
+        panel.webview.postMessage({
+          command: 'cleanBackupListResult',
+          success: true,
+          backupList: [],
+          type: type
+        });
+        return;
+      }
+
+      const files = fs.readdirSync(backupDir);
+      const backupFiles: Array<{ fileName: string, displayName: string, timestamp: string }> = [];
+
+      files.forEach(file => {
+        const match = file.match(/(.+)_(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})\.backup$/);
+        if (match) {
+          const [, fileName, timestamp] = match;
+          backupFiles.push({
+            fileName: file,
+            displayName: `${fileName} (${this.formatTimestamp(timestamp)})`,
+            timestamp: this.formatTimestamp(timestamp)
+          });
+        }
+      });
+
+      panel.webview.postMessage({
+        command: 'cleanBackupListResult',
+        success: true,
+        backupList: backupFiles.sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
+        type: type
+      });
+    } catch (error) {
+      panel.webview.postMessage({
+        command: 'cleanBackupListResult',
+        success: false,
+        message: `获取清理备份列表失败: ${error}`
+      });
+    }
+  }
+
+  // 辅助方法
+  private generateTimestamp(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    const second = String(now.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day}-${hour}-${minute}-${second}`;
+  }
+
+  private formatTimestamp(timestamp: string): string {
+    try {
+      const [year, month, day, hour, minute, second] = timestamp.split('-');
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    } catch (error) {
+      return timestamp;
+    }
   }
 } 

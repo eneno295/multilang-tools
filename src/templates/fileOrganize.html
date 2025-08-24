@@ -63,33 +63,265 @@
       }
     }
 
-    .action-buttons {
-      display: flex;
-      gap: 15px;
-      margin-bottom: 20px;
-      justify-content: center;
+    .section {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
     }
 
-    button {
+    .button-group {
+      display: flex;
+      gap: 16px;
+    }
+
+    .button-group>div {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .button-group .btn {
+      width: 100%;
+      margin: 0;
+    }
+
+    .button-group .secondary-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .button-group .secondary-buttons .btn {
+      flex: 1;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+
+    /* Source info: 3-column brief stats */
+    .source-brief-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .brief-item {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .brief-label {
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .brief-value {
+      font-weight: bold;
+      font-size: 18px;
+      color: var(--vscode-editor-foreground);
+    }
+
+    /* 备份文件选择器样式 */
+    .backup-selector {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1000;
+    }
+
+    .backup-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .backup-dialog {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 80%;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .backup-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .backup-header h3 {
+      margin: 0;
+      color: var(--vscode-editor-foreground);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--vscode-editor-foreground);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .close-btn:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+
+    .backup-list {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .backup-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      margin: 4px 0;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+
+    .backup-item:hover {
+      background: var(--vscode-editor-background);
+    }
+
+    .backup-info {
+      flex: 1;
+    }
+
+    .backup-name {
+      font-weight: bold;
+      color: var(--vscode-editor-foreground);
+      margin-bottom: 4px;
+    }
+
+    .backup-time {
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
+    }
+
+    .backup-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .backup-footer {
+      padding: 16px;
+      border-top: 1px solid var(--vscode-panel-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* 确认对话框样式 */
+    .confirm-dialog {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1001;
+    }
+
+    .confirm-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .confirm-content {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .confirm-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+
+    .confirm-header h3 {
+      margin: 0;
+      color: var(--vscode-editor-foreground);
+    }
+
+    .confirm-body {
+      padding: 16px;
+      color: var(--vscode-editor-foreground);
+    }
+
+    .confirm-footer {
+      padding: 16px;
+      border-top: 1px solid var(--vscode-panel-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .btn {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
       border: none;
-      padding: 10px 20px;
-      border-radius: 6px;
+      padding: 8px 16px;
+      border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
-      font-weight: 500;
-      transition: background-color 0.2s;
+      margin-right: 10px;
     }
 
-    button:hover {
+    .btn:hover {
       background: var(--vscode-button-hoverBackground);
     }
 
-    button:disabled {
+    .btn.secondary {
       background: var(--vscode-button-secondaryBackground);
       color: var(--vscode-button-secondaryForeground);
-      cursor: not-allowed;
+    }
+
+    .btn.secondary:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .btn.danger {
+      background: #f85149;
+      color: #ffffff;
+      border-color: #f85149;
+    }
+
+    .btn.danger:hover {
+      background: #d1242f;
+      border-color: #d1242f;
     }
 
     .organize-results {
@@ -107,25 +339,6 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 15px;
-    }
-
-    .close-btn {
-      position: absolute;
-      top: 0;
-      right: 0;
-      background: none;
-      border: none;
-      color: var(--vscode-descriptionForeground);
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-      font-size: 16px;
-      line-height: 1;
-    }
-
-    .close-btn:hover {
-      background: var(--vscode-toolbar-hoverBackground);
-      color: var(--vscode-foreground);
     }
 
     .organize-results h3 {
@@ -296,7 +509,7 @@
 
 <body>
   <div class="container">
-    <h2>整理文件</h2>
+    <h2>错误码 - 整理文件</h2>
 
     <div class="file-info" id="fileInfo">
       <div class="loading">
@@ -305,9 +518,39 @@
       </div>
     </div>
 
-    <div class="action-buttons">
+    <!-- <div class="action-buttons">
       <button id="organizeSourceBtn" onclick="organizeSourceFile()">整理源文件</button>
       <button id="organizeTargetBtn" onclick="organizeTargetFiles()">整理目标文件</button>
+    </div> -->
+    <div class="section">
+      <div class="button-group">
+        <div>
+          <button id="organizeSourceBtn" class="btn" onclick="organizeSourceFile()">整理源文件</button>
+          <div class="secondary-buttons">
+            <button id="backupSourceBtn" class="btn secondary">备份</button>
+            <button id="restoreSourceBtn" class="btn secondary">还原</button>
+            <button id="cleanBackupSourceBtn" class="btn secondary">清理</button>
+          </div>
+        </div>
+        <div>
+          <button id="organizeTargetBtn" class="btn" onclick="organizeTargetFiles()">整理目标文件</button>
+          <div class="secondary-buttons">
+            <button id="backupTargetBtn" class="btn secondary">备份</button>
+            <button id="restoreTargetBtn" class="btn secondary">还原</button>
+            <button id="cleanBackupTargetBtn" class="btn secondary">清理</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sourceInfoSection" class="section">
+      <strong style="display: block; margin-bottom: 10px;">源文件信息：</strong>
+      <div id="sourceInfoContent">
+        <div style="text-align: center; padding: 20px; color: var(--vscode-descriptionForeground);">
+          <div class="spinner"></div>
+          正在加载源文件信息...
+        </div>
+      </div>
     </div>
 
     <div class="organize-results" id="organizeResults">
@@ -316,27 +559,59 @@
         <button class="close-btn" onclick="closeOrganizeResults()" title="关闭">×</button>
       </div>
 
-      <!-- 源文件信息 -->
-      <div class="source-info" id="sourceInfo" style="display: none;">
-        <h3>源文件信息</h3>
-        <div class="info-grid">
-          <div class="info-item">
-            <div class="info-label">源文件</div>
-            <div class="info-value" id="sourceFileName">-</div>
+      <!-- 整理结果 -->
+      <div id="organizeList">
+      </div>
+    </div>
+
+    <!-- 备份文件选择器 -->
+    <div id="backupSelector" class="backup-selector" style="display: none;">
+      <div class="backup-overlay">
+        <div class="backup-dialog">
+          <div class="backup-header">
+            <h3 id="backupSelectorTitle">选择要还原的备份文件</h3>
+            <button class="close-btn" onclick="hideBackupSelector()">×</button>
           </div>
-          <div class="info-item">
-            <div class="info-label">总行数</div>
-            <div class="info-value" id="sourceTotalLines">-</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">总键数</div>
-            <div class="info-value" id="sourceTotalKeys">-</div>
+          <div class="backup-list" id="backupList">
+            <!-- 备份文件列表将在这里动态生成 -->
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- 整理结果 -->
-      <div id="organizeList">
+    <!-- 清理备份文件选择器 -->
+    <div id="cleanBackupSelector" class="backup-selector" style="display: none;">
+      <div class="backup-overlay">
+        <div class="backup-dialog">
+          <div class="backup-header">
+            <h3 id="cleanBackupSelectorTitle">选择要清理的备份文件</h3>
+            <button class="close-btn" onclick="hideCleanBackupSelector()">×</button>
+          </div>
+          <div class="backup-list" id="cleanBackupList">
+            <!-- 备份文件列表将在这里动态生成 -->
+          </div>
+          <div class="backup-footer" id="delFooter">
+            <button class="btn danger" onclick="cleanAllBackups()">一键删除全部</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 确认删除对话框 -->
+    <div id="confirmDialog" class="confirm-dialog" style="display: none;">
+      <div class="confirm-overlay">
+        <div class="confirm-content">
+          <div class="confirm-header">
+            <h3 id="confirmTitle">确认删除</h3>
+          </div>
+          <div class="confirm-body" id="confirmMessage">
+            <!-- 确认消息将在这里动态生成 -->
+          </div>
+          <div class="confirm-footer">
+            <button class="btn secondary" onclick="hideConfirmDialog()">取消</button>
+            <button class="btn danger" id="confirmDeleteBtn">确认删除</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -347,12 +622,44 @@
     // 页面加载时获取文件信息
     window.addEventListener('load', () => {
       loadFileInfo();
+      setupBackupButtons();
     });
 
     // 加载文件信息
     function loadFileInfo() {
       vscode.postMessage({ command: 'getFileInfo' });
     }
+
+    // 设置备份按钮事件
+    function setupBackupButtons() {
+      // 源文件备份按钮
+      document.getElementById('backupSourceBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'backupSource' });
+      });
+
+      document.getElementById('restoreSourceBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'getBackupList', type: 'source' });
+      });
+
+      document.getElementById('cleanBackupSourceBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'getCleanBackupList', type: 'source' });
+      });
+
+      // 目标文件备份按钮
+      document.getElementById('backupTargetBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'backupTarget' });
+      });
+
+      document.getElementById('restoreTargetBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'getBackupList', type: 'target' });
+      });
+
+      document.getElementById('cleanBackupTargetBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'getCleanBackupList', type: 'target' });
+      });
+    }
+
+    let currentCleanType = '';
 
     // 整理源文件
     function organizeSourceFile() {
@@ -401,15 +708,41 @@
         case 'organizeResult':
           handleOrganizeResult(message);
           break;
+        case 'backupSourceResult':
+          handleBackupResult(message, '源文件');
+          break;
+        case 'backupTargetResult':
+          handleBackupResult(message, '目标文件');
+          break;
+        case 'restoreSourceResult':
+          handleRestoreResult(message, '源文件');
+          break;
+        case 'restoreTargetResult':
+          handleRestoreResult(message, '目标文件');
+          break;
+        case 'cleanBackupSourceResult':
+          handleCleanBackupResult(message, '源文件');
+          break;
+        case 'cleanBackupTargetResult':
+          handleCleanBackupResult(message, '目标文件');
+          break;
+        case 'backupListResult':
+          showBackupSelector(message, 'restore');
+          break;
+        case 'cleanBackupListResult':
+          showCleanBackupSelector(message);
+          break;
       }
     });
 
     // 处理文件信息结果
     function handleFileInfoResult(message) {
       const fileInfo = document.getElementById('fileInfo');
+      const sourceInfoSection = document.getElementById('sourceInfoSection');
 
       if (!message.success) {
-        fileInfo.innerHTML = `<div class="error-result">❌ ${message.message}</div>`;
+        fileInfo.style.display = 'block';
+        fileInfo.innerHTML = `<div class="error">❌ ${message.message}</div>`;
         return;
       }
 
@@ -417,7 +750,30 @@
       const targetFiles = message.files || [];
       const targetFileNames = targetFiles.map(f => f.name).join(', ');
 
+      // 显示文件信息
+      fileInfo.style.display = 'block';
       fileInfo.innerHTML = `源文件: ${sourceFile}, 目标语言文件: ${targetFileNames}`;
+
+      // 显示源文件详细信息
+      if (message.sourceInfo) {
+        const sourceInfoContent = document.getElementById('sourceInfoContent');
+        sourceInfoContent.innerHTML = `
+          <div class="source-brief-stats">
+            <div class="brief-item">
+              <div class="brief-label">源文件</div>
+              <div class="brief-value">${message.sourceInfo.name}</div>
+            </div>
+            <div class="brief-item">
+              <div class="brief-label">总行数</div>
+              <div class="brief-value">${message.sourceInfo.lines || 0}</div>
+            </div>
+            <div class="brief-item">
+              <div class="brief-label">总键数</div>
+              <div class="brief-value">${message.sourceInfo.keys || 0}</div>
+            </div>
+          </div>
+        `;
+      }
     }
 
     // 处理整理结果
@@ -425,7 +781,7 @@
       const organizeList = document.getElementById('organizeList');
       const organizeSourceBtn = document.getElementById('organizeSourceBtn');
       const organizeTargetBtn = document.getElementById('organizeTargetBtn');
-      const sourceInfo = document.getElementById('sourceInfo');
+
 
       // 重置按钮状态
       organizeSourceBtn.textContent = '整理源文件';
@@ -440,7 +796,6 @@
 
       if (message.type === 'source') {
         // 源文件整理结果
-        sourceInfo.style.display = 'none';
         organizeList.innerHTML = `
           <div class="success-result">
             <div class="result-item">
@@ -451,14 +806,6 @@
           </div>
         `;
       } else if (message.type === 'target') {
-        // 显示源文件信息
-        if (message.sourceInfo) {
-          document.getElementById('sourceFileName').textContent = message.sourceInfo.file;
-          document.getElementById('sourceTotalLines').textContent = message.sourceInfo.lines;
-          document.getElementById('sourceTotalKeys').textContent = message.sourceInfo.keys;
-          sourceInfo.style.display = 'block';
-        }
-
         // 目标文件整理结果
         let html = '';
         message.results.forEach(result => {
@@ -520,6 +867,195 @@
 
         organizeList.innerHTML = html;
       }
+    }
+
+    // 处理备份结果
+    function handleBackupResult(message, type) {
+      if (message.success) {
+        showResults(`${type}备份成功`, message.message);
+      } else {
+        showError(`${type}备份失败: ${message.message}`);
+      }
+    }
+
+    // 处理还原结果
+    function handleRestoreResult(message, type) {
+      if (message.success) {
+        showResults(`${type}还原成功`, message.message);
+      } else {
+        showError(`${type}还原失败: ${message.message}`);
+      }
+    }
+
+    // 处理清理备份结果
+    function handleCleanBackupResult(message, type) {
+      if (message.success) {
+        showResults(`${type}备份清理成功`, message.message);
+      } else {
+        showError(`${type}备份清理失败: ${message.message}`);
+      }
+    }
+
+    // 显示备份文件选择器
+    function showBackupSelector(message, actionType) {
+      if (!message.success || !message.backupList || message.backupList.length === 0) {
+        showError('没有找到备份文件');
+        return;
+      }
+
+      const backupSelector = document.getElementById('backupSelector');
+      const backupList = document.getElementById('backupList');
+      const titleElement = document.getElementById('backupSelectorTitle');
+
+      titleElement.textContent = `选择要${actionType === 'restore' ? '还原' : '清理'}的${message.type === 'source' ? '源文件' : '目标文件'}备份`;
+
+      backupList.innerHTML = '';
+      message.backupList.forEach(backup => {
+        const backupItem = document.createElement('div');
+        backupItem.className = 'backup-item';
+        backupItem.innerHTML = `
+          <div class="backup-info">
+            <div class="backup-name">${backup.displayName}</div>
+            <div class="backup-time">${backup.timestamp}</div>
+          </div>
+          <div class="backup-actions">
+            <button class="btn secondary" onclick="restoreFromBackup('${backup.fileName}', '${message.type}')">还原</button>
+          </div>
+        `;
+        backupList.appendChild(backupItem);
+      });
+
+      backupSelector.style.display = 'block';
+    }
+
+    // 显示清理备份文件选择器
+    function showCleanBackupSelector(message) {
+      if (!message.success || !message.backupList || message.backupList.length === 0) {
+        showError('没有找到备份文件');
+        return;
+      }
+
+      // 设置当前清理类型，供一键删除全部使用
+      currentCleanType = message.type;
+      console.log('设置清理类型:', message.type);
+
+      const cleanBackupSelector = document.getElementById('cleanBackupSelector');
+      const cleanBackupList = document.getElementById('cleanBackupList');
+      const titleElement = document.getElementById('cleanBackupSelectorTitle');
+
+      titleElement.textContent = `选择要清理的${message.type === 'source' ? '源文件' : '目标文件'}备份`;
+
+      cleanBackupList.innerHTML = '';
+      message.backupList.forEach(backup => {
+        const backupItem = document.createElement('div');
+        backupItem.className = 'backup-item';
+        backupItem.innerHTML = `
+          <div class="backup-info">
+            <div class="backup-name">${backup.displayName}</div>
+            <div class="backup-time">${backup.timestamp}</div>
+          </div>
+          <div class="backup-actions">
+            <button class="btn danger" onclick="cleanSingleBackup('${backup.fileName}', '${message.type}')">删除</button>
+          </div>
+        `;
+        cleanBackupList.appendChild(backupItem);
+      });
+
+      cleanBackupSelector.style.display = 'block';
+    }
+
+    // 从备份文件还原
+    function restoreFromBackup(backupFile, type) {
+      hideBackupSelector();
+      vscode.postMessage({
+        command: type === 'source' ? 'restoreSource' : 'restoreTarget',
+        backupFile: backupFile
+      });
+    }
+
+    // 清理单个备份文件
+    function cleanSingleBackup(backupFile, type) {
+      hideCleanBackupSelector();
+      vscode.postMessage({
+        command: type === 'source' ? 'cleanBackupSource' : 'cleanBackupTarget',
+        backupFile: backupFile
+      });
+    }
+
+    // 清理所有备份文件
+    function cleanAllBackups() {
+      console.log('一键删除全部 - 当前清理类型:', currentCleanType);
+
+      if (!currentCleanType) {
+        showError('错误：无法确定清理类型，请重新打开清理对话框');
+        return;
+      }
+
+      // 使用自定义确认对话框而不是浏览器的 confirm()
+      showConfirmDialog(
+        `确定要删除所有${currentCleanType === 'source' ? '源文件' : '目标文件'}备份吗？此操作不可撤销！`,
+        () => {
+          console.log('用户确认删除，发送命令:', currentCleanType === 'source' ? 'cleanBackupSource' : 'cleanBackupTarget');
+          hideConfirmDialog();
+          hideCleanBackupSelector();
+          vscode.postMessage({
+            command: currentCleanType === 'source' ? 'cleanBackupSource' : 'cleanBackupTarget'
+          });
+        }
+      );
+    }
+
+    // 隐藏备份文件选择器
+    function hideBackupSelector() {
+      document.getElementById('backupSelector').style.display = 'none';
+    }
+
+    // 隐藏清理备份文件选择器
+    function hideCleanBackupSelector() {
+      document.getElementById('cleanBackupSelector').style.display = 'none';
+    }
+
+    // 显示结果
+    function showResults(title, content) {
+      const organizeResults = document.getElementById('organizeResults');
+      const organizeList = document.getElementById('organizeList');
+      const organizeTitle = document.getElementById('organizeTitle');
+
+      organizeTitle.textContent = title;
+      organizeList.innerHTML = content;
+      organizeResults.style.display = 'block';
+    }
+
+    // 显示错误
+    function showError(message) {
+      const organizeResults = document.getElementById('organizeResults');
+      const organizeList = document.getElementById('organizeList');
+      const organizeTitle = document.getElementById('organizeTitle');
+
+      organizeTitle.textContent = '操作失败';
+      organizeList.innerHTML = `<div class="error-result">❌ ${message}</div>`;
+      organizeResults.style.display = 'block';
+    }
+
+    // 显示确认对话框
+    function showConfirmDialog(message, onConfirm) {
+      const messageElement = document.getElementById('confirmMessage');
+      const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+      messageElement.textContent = message;
+
+      // 移除之前的事件监听器
+      confirmBtn.onclick = null;
+
+      // 添加新的事件监听器
+      confirmBtn.onclick = onConfirm;
+
+      document.getElementById('confirmDialog').style.display = 'block';
+    }
+
+    // 隐藏确认对话框
+    function hideConfirmDialog() {
+      document.getElementById('confirmDialog').style.display = 'none';
     }
   </script>
 </body>
