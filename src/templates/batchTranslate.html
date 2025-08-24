@@ -97,6 +97,21 @@
       font-weight: 500;
     }
 
+    .translator-icon {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      line-height: 16px;
+      text-align: center;
+      margin-right: 8px;
+      vertical-align: middle;
+      font-size: 12px;
+      font-weight: bold;
+      border-radius: 2px;
+      background-color: var(--vscode-focusBorder);
+      color: var(--vscode-editor-background);
+    }
+
     .loading {
       text-align: center;
       padding: 20px;
@@ -457,6 +472,17 @@
       checkList.innerHTML = html;
     }
 
+    // 获取翻译工具文字标识
+    function getTranslatorText(translator) {
+      if (translator === 'google') {
+        return 'G';
+      } else if (translator === 'mymemory') {
+        return 'M';
+      } else {
+        return '?';
+      }
+    }
+
     // 处理翻译进度
     function handleTranslateProgress(message) {
       const translateProgress = document.getElementById('translateProgress');
@@ -482,7 +508,7 @@
           if (fileContent) {
             const progressHtml = `
               <div class="translate-item">
-                <span class="status success">✅</span>
+                <span class="translator-icon">${getTranslatorText(message.translator || 'default')}</span>
                 <span class="code">${message.code}</span>
                 <span class="message">${message.translatedMessage}</span>
                 <span class="line">(第${message.lineNumber}行)</span>

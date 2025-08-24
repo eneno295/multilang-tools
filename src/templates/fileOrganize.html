@@ -325,7 +325,6 @@
     }
 
     .organize-results {
-      background: var(--vscode-panel-background);
       border-radius: 8px;
       padding: 15px;
       margin-bottom: 20px;
@@ -435,74 +434,115 @@
     }
 
     .result-card {
-      background: var(--vscode-panel-background);
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 15px;
+      background: var(--vscode-editor-background);
       border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
     }
 
-    .result-card .card-header {
+    .result-header {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px;
-    }
-
-    .result-card .file-name {
-      font-weight: bold;
-      color: var(--vscode-foreground);
-    }
-
-    .result-card .status {
-      display: flex;
       align-items: center;
-      font-size: 14px;
-      font-weight: 500;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      padding-bottom: 12px;
     }
 
-    .result-card .status.success {
-      color: #28a745;
-    }
-
-    .result-card .status.error {
-      color: var(--vscode-errorForeground);
-    }
-
-    .result-card .status-icon {
-      margin-right: 6px;
+    .file-name {
+      font-weight: bold;
+      color: var(--vscode-textLink-foreground);
       font-size: 16px;
     }
 
-    .result-card .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .result-card .stat-item {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .result-card .stat-label {
+    .status {
+      padding: 6px 12px;
+      border-radius: 4px;
       font-size: 12px;
-      color: var(--vscode-descriptionForeground);
+      font-weight: bold;
+      color: white;
+    }
+
+    .status.success {
+      background: var(--vscode-notificationsInfoIcon-foreground);
+    }
+
+    .status.error {
+      background: var(--vscode-notificationsErrorIcon-foreground);
+      color: #fff;
+    }
+
+    .result-stats {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-item {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--vscode-textLink-foreground);
       margin-bottom: 4px;
     }
 
-    .result-card .stat-value {
+    .stat-label {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .stat-item.missing {
+      border-color: var(--vscode-notificationsErrorIcon-foreground);
+    }
+
+    .stat-item.missing .stat-value {
+      color: var(--vscode-notificationsErrorIcon-foreground);
+    }
+
+    .stat-item.redundant {
+      border-color: var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    .stat-item.redundant .stat-value {
+      color: var(--vscode-notificationsWarningIcon-foreground);
+    }
+
+    /* 键详情样式 */
+    .key-details {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+
+    .key-details-title {
       font-weight: bold;
-      color: var(--vscode-foreground);
+      margin-bottom: 8px;
+      color: var(--vscode-textLink-foreground);
     }
 
-    .result-card .stat-value.missing {
-      color: var(--vscode-errorForeground);
-    }
-
-    .result-card .stat-value.redundant {
-      color: #ffa500;
+    .key-details-content {
+      font-family: monospace;
+      background: var(--vscode-textBlockQuote-background);
+      padding: 8px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-size: 12px;
+      line-height: 1.4;
+      max-height: 300px;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
   </style>
 </head>
@@ -553,16 +593,13 @@
       </div>
     </div>
 
-    <div class="organize-results" id="organizeResults">
-      <div class="section-header">
-        <h3 id="organizeTitle">整理结果:</h3>
-        <button class="close-btn" onclick="closeOrganizeResults()" title="关闭">×</button>
-      </div>
-
-      <!-- 整理结果 -->
-      <div id="organizeList">
-      </div>
+    <div id="resultsSection" class="section" style="display: none;">
+      <strong style="display: block; margin-bottom: 10px;" id="resultsTitle">操作结果：</strong>
+      <div id="resultsList"></div>
     </div>
+
+    <div id="loadingSection" class="loading" style="display: none;">正在分析文件结构，请稍候...</div>
+    <div id="errorSection" class="error" style="display: none;"></div>
 
     <!-- 备份文件选择器 -->
     <div id="backupSelector" class="backup-selector" style="display: none;">
@@ -625,6 +662,106 @@
       setupBackupButtons();
     });
 
+    // 创建结果卡片头部HTML
+    function createResultCardHeader(fileName, status, statusClass = 'success') {
+      return `
+        <div class="result-card">
+          <div class="result-header">
+            <div class="file-name">${fileName}</div>
+            <div class="status ${statusClass}">${status}</div>
+          </div>
+      `;
+    }
+
+    // 创建统计信息HTML
+    function createStatsHTML(stats) {
+      return `
+        <div class="result-stats">
+          <div class="stat-item">
+            <div class="stat-value">${stats.originalLines}</div>
+            <div class="stat-label">原始行数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${stats.organizedLines}(${stats.organizedLines - stats.originalLines})</div>
+            <div class="stat-label">整理后行数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${stats.originalKeys}</div>
+            <div class="stat-label">原始键数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${stats.organizedKeys}</div>
+            <div class="stat-label">整理后键数</div>
+          </div>
+          <div class="stat-item missing">
+            <div class="stat-value">${stats.missingKeys || 0}</div>
+            <div class="stat-label">缺失键数</div>
+          </div>
+          <div class="stat-item redundant">
+            <div class="stat-value">${stats.redundantKeys || 0}</div>
+            <div class="stat-label">多余键数</div>
+          </div>
+        </div>
+        ${stats.missingKeys > 0 ? `
+          <div class="key-details">
+            <div class="key-details-title">缺失的键：</div>
+            <div class="key-details-content">${getMissingKeysList(stats)}</div>
+          </div>
+        ` : ''}
+        ${stats.redundantKeys > 0 ? `
+          <div class="key-details">
+            <div class="key-details-title">多余的键：</div>
+            <div class="key-details-content">${getRedundantKeysList(stats)}</div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // 显示加载状态并隐藏结果区域
+    function showLoading() {
+      document.getElementById('loadingSection').style.display = 'block';
+      document.getElementById('resultsSection').style.display = 'none';
+    }
+
+    // 隐藏加载状态
+    function hideLoading() {
+      document.getElementById('loadingSection').style.display = 'none';
+    }
+
+    // 显示错误信息
+    function showError(msg) {
+      const el = document.getElementById('errorSection');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    // 隐藏错误信息
+    function hideError() {
+      document.getElementById('errorSection').style.display = 'none';
+    }
+
+    // 获取缺失键值对列表
+    function getMissingKeysList(stats) {
+      if (stats.missingKeys === 0) return '';
+
+      if (stats.missingKeyList && stats.missingKeyList.length > 0) {
+        return stats.missingKeyList.map(item => `${item.key}: "${item.value}"`).join('\n');
+      }
+
+      return `缺失 ${stats.missingKeys} 个键`;
+    }
+
+    // 获取多余键值对列表
+    function getRedundantKeysList(stats) {
+      if (stats.redundantKeys === 0) return '';
+
+      if (stats.redundantKeyList && stats.redundantKeyList.length > 0) {
+        return stats.redundantKeyList.map(item => `${item.key}: "${item.value}"`).join('\n');
+      }
+
+      return `多余 ${stats.redundantKeys} 个键`;
+    }
+
     // 加载文件信息
     function loadFileInfo() {
       vscode.postMessage({ command: 'getFileInfo' });
@@ -667,11 +804,9 @@
       organizeSourceBtn.textContent = '整理中...';
       organizeSourceBtn.disabled = true;
 
-      // 显示整理结果区域
-      const organizeResults = document.getElementById('organizeResults');
-      const organizeList = document.getElementById('organizeList');
-      organizeList.innerHTML = '<div class="loading"><div class="spinner"></div>正在整理源文件...</div>';
-      organizeResults.style.display = 'block';
+      // 显示加载状态并隐藏结果区域
+      showLoading();
+      hideError();
 
       vscode.postMessage({ command: 'organizeSourceFile' });
     }
@@ -682,19 +817,11 @@
       organizeTargetBtn.textContent = '整理中...';
       organizeTargetBtn.disabled = true;
 
-      // 显示整理结果区域
-      const organizeResults = document.getElementById('organizeResults');
-      const organizeList = document.getElementById('organizeList');
-      organizeList.innerHTML = '<div class="loading"><div class="spinner"></div>正在整理目标文件...</div>';
-      organizeResults.style.display = 'block';
+      // 显示加载状态并隐藏结果区域
+      showLoading();
+      hideError();
 
       vscode.postMessage({ command: 'organizeTargetFiles' });
-    }
-
-    // 关闭整理结果
-    function closeOrganizeResults() {
-      const organizeResults = document.getElementById('organizeResults');
-      organizeResults.style.display = 'none';
     }
 
     // 监听扩展消息
@@ -778,9 +905,12 @@
 
     // 处理整理结果
     function handleOrganizeResult(message) {
-      const organizeList = document.getElementById('organizeList');
+      const resultsList = document.getElementById('resultsList');
       const organizeSourceBtn = document.getElementById('organizeSourceBtn');
       const organizeTargetBtn = document.getElementById('organizeTargetBtn');
+
+      // 隐藏加载状态
+      hideLoading();
 
 
       // 重置按钮状态
@@ -790,82 +920,85 @@
       organizeTargetBtn.disabled = false;
 
       if (!message.success) {
-        organizeList.innerHTML = `<div class="error-result">❌ ${message.message}</div>`;
+        showError(message.message);
         return;
       }
 
       if (message.type === 'source') {
         // 源文件整理结果
-        organizeList.innerHTML = `
-          <div class="success-result">
-            <div class="result-item">
-              <span class="status success">✅</span>
-              <span class="file-name">${message.file}</span>
-              <span class="message">${message.message}</span>
+        resultsList.innerHTML = `
+          <div class="result-card">
+            <div class="result-header">
+              <div class="file-name">${message.file}</div>
+              <div class="status success">已整理</div>
+            </div>
+            <div class="result-stats">
+              <div class="stat-item">
+                <div class="stat-value">${message.sourceInfo?.originalLines || 0}</div>
+                <div class="stat-label">原始行数</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">${message.sourceInfo?.organizedLines || 0}(${(message.sourceInfo?.organizedLines || 0) - (message.sourceInfo?.originalLines || 0)})</div>
+                <div class="stat-label">整理后行数</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">${message.sourceInfo?.originalKeys || 0}</div>
+                <div class="stat-label">原始键数</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">${message.sourceInfo?.organizedKeys || 0}</div>
+                <div class="stat-label">整理后键数</div>
+              </div>
+              <div class="stat-item missing">
+                <div class="stat-value">0</div>
+                <div class="stat-label">缺失键数</div>
+              </div>
+              <div class="stat-item redundant">
+                <div class="stat-value">0</div>
+                <div class="stat-label">多余键数</div>
+              </div>
             </div>
           </div>
         `;
+
+        // 显示结果区域
+        document.getElementById('resultsSection').style.display = 'block';
       } else if (message.type === 'target') {
         // 目标文件整理结果
         let html = '';
         message.results.forEach(result => {
           if (result.success) {
-            html += `
-              <div class="result-card">
-                <div class="card-header">
-                  <div class="file-name">${result.file}</div>
-                  <div class="status success">
-                    <span class="status-icon">✅</span>
-                    成功
-                  </div>
-                </div>
-                <div class="stats-grid">
-                  <div class="stat-item">
-                    <div class="stat-label">原始行数</div>
-                    <div class="stat-value">${result.originalLines || 0}</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-label">整理后行数</div>
-                    <div class="stat-value">${result.organizedLines || 0} (${(result.organizedLines || 0) - (result.originalLines || 0)})</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-label">原始键数</div>
-                    <div class="stat-value">${result.originalKeys || 0}</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-label">整理后键数</div>
-                    <div class="stat-value">${result.organizedKeys || 0}</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-label">缺失键数</div>
-                    <div class="stat-value missing">${result.missingKeys || 0}</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-label">多余键数</div>
-                    <div class="stat-value redundant">${result.redundantKeys || 0}</div>
-                  </div>
-                </div>
-              </div>
-            `;
+            html += createResultCardHeader(result.file, '已整理', 'success') +
+              createStatsHTML({
+                fileName: result.file,
+                originalLines: result.originalLines || 0,
+                organizedLines: result.organizedLines || 0,
+                originalKeys: result.originalKeys || 0,
+                organizedKeys: result.organizedKeys || 0,
+                missingKeys: result.missingKeys || 0,
+                redundantKeys: result.redundantKeys || 0,
+                missingKeyList: result.missingKeyList || [],
+                redundantKeyList: result.redundantKeyList || []
+              }) + '</div>';
           } else {
             html += `
               <div class="result-card">
-                <div class="card-header">
+                <div class="result-header">
                   <div class="file-name">${result.file}</div>
-                  <div class="status error">
-                    <span class="status-icon">❌</span>
-                    失败
-                  </div>
+                  <div class="status error">整理失败</div>
                 </div>
-                <div style="color: var(--vscode-errorForeground); margin-top: 10px;">
-                  ${result.message}
+                <div style="padding: 10px; color: var(--vscode-notificationsErrorIcon-foreground);">
+                  ${result.message || '整理失败'}
                 </div>
               </div>
             `;
           }
         });
 
-        organizeList.innerHTML = html;
+        resultsList.innerHTML = html;
+
+        // 显示结果区域
+        document.getElementById('resultsSection').style.display = 'block';
       }
     }
 
@@ -1017,24 +1150,24 @@
 
     // 显示结果
     function showResults(title, content) {
-      const organizeResults = document.getElementById('organizeResults');
-      const organizeList = document.getElementById('organizeList');
-      const organizeTitle = document.getElementById('organizeTitle');
+      const resultsSection = document.getElementById('resultsSection');
+      const resultsList = document.getElementById('resultsList');
+      const resultsTitle = document.getElementById('resultsTitle');
 
-      organizeTitle.textContent = title;
-      organizeList.innerHTML = content;
-      organizeResults.style.display = 'block';
+      resultsTitle.textContent = title;
+      resultsList.innerHTML = content;
+      resultsSection.style.display = 'block';
     }
 
     // 显示错误
     function showError(message) {
-      const organizeResults = document.getElementById('organizeResults');
-      const organizeList = document.getElementById('organizeList');
-      const organizeTitle = document.getElementById('organizeTitle');
+      const resultsSection = document.getElementById('resultsSection');
+      const resultsList = document.getElementById('resultsList');
+      const resultsTitle = document.getElementById('resultsTitle');
 
-      organizeTitle.textContent = '操作失败';
-      organizeList.innerHTML = `<div class="error-result">❌ ${message}</div>`;
-      organizeResults.style.display = 'block';
+      resultsTitle.textContent = '操作失败';
+      resultsList.innerHTML = `<div class="error-result">❌ ${message}</div>`;
+      resultsSection.style.display = 'block';
     }
 
     // 显示确认对话框

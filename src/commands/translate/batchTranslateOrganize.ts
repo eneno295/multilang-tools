@@ -268,7 +268,7 @@ export class BatchTranslateOrganizeCommand {
       const hasChanges = originalContent !== formattedContent;
 
       // 检查是否需要自动备份
-      const backupDir = path.join(path.dirname(sourceFilePath), 'backups');
+      const backupDir = path.join(path.dirname(sourceFilePath), 'backups', 'source');
       const fileName = path.basename(config.sourceFile, path.extname(config.sourceFile));
       const backupFileName = this.shouldCreateBackup(backupDir, fileName) ?
         this.createBackupFile(originalContent, backupDir, fileName) : '';
@@ -369,7 +369,7 @@ export class BatchTranslateOrganizeCommand {
           const redundantKeys = redundantKeyList.length;
 
           // 检查是否需要自动备份
-          const backupDir = path.join(path.dirname(targetFilePath), 'backups');
+          const backupDir = path.join(path.dirname(targetFilePath), 'backups', 'target');
           const fileName = path.basename(targetFileName, path.extname(targetFileName));
           const backupFileName = this.shouldCreateBackup(backupDir, fileName) ?
             this.createBackupFile(targetContent, backupDir, fileName) : '';
@@ -427,7 +427,7 @@ export class BatchTranslateOrganizeCommand {
       const workspacePath = this.getWorkspacePath();
       const baseDir = path.join(workspacePath, config.translatePath);
       const sourceFilePath = path.join(baseDir, config.sourceFile);
-      const backupDir = path.join(baseDir, 'backups');
+      const backupDir = path.join(baseDir, 'backups', 'source');
 
       // 查找备份文件
       let backupPath = '';
@@ -505,7 +505,7 @@ export class BatchTranslateOrganizeCommand {
       // 还原每个目标文件
       for (const targetFileName of targetFiles) {
         const targetFilePath = path.join(baseDir, targetFileName);
-        const backupDir = path.join(baseDir, 'backups');
+        const backupDir = path.join(baseDir, 'backups', 'target');
 
         // 查找备份文件
         let backupPath = '';
@@ -1207,7 +1207,7 @@ export class BatchTranslateOrganizeCommand {
       const config = this.getConfig();
       const workspacePath = this.getWorkspacePath();
       const baseDir = path.join(workspacePath, config.translatePath);
-      const backupDir = path.join(baseDir, 'backups');
+      const backupDir = path.join(baseDir, 'backups', 'source');
 
       if (!fs.existsSync(backupDir)) {
         panel.webview.postMessage({
@@ -1304,7 +1304,7 @@ export class BatchTranslateOrganizeCommand {
       const config = this.getConfig();
       const workspacePath = this.getWorkspacePath();
       const baseDir = path.join(workspacePath, config.translatePath);
-      const backupDir = path.join(baseDir, 'backups');
+      const backupDir = path.join(baseDir, 'backups', 'target');
 
       if (!fs.existsSync(backupDir)) {
         panel.webview.postMessage({
@@ -1406,9 +1406,27 @@ export class BatchTranslateOrganizeCommand {
       const config = this.getConfig();
       const workspacePath = this.getWorkspacePath();
       const baseDir = path.join(workspacePath, config.translatePath);
-      const backupDir = path.join(baseDir, 'backups');
+      let backupDir: string;
+      let allFiles: string[] = [];
 
-      if (!fs.existsSync(backupDir)) {
+      if (type === 'source') {
+        // 获取源文件的备份
+        backupDir = path.join(baseDir, 'backups', 'source');
+        if (fs.existsSync(backupDir)) {
+          allFiles = fs.readdirSync(backupDir);
+        }
+      } else if (type === 'target') {
+        // 获取目标文件的备份
+        backupDir = path.join(baseDir, 'backups', 'target');
+        if (fs.existsSync(backupDir)) {
+          allFiles = fs.readdirSync(backupDir);
+        }
+      } else {
+        // 无效的类型，设置默认值
+        backupDir = path.join(baseDir, 'backups');
+      }
+
+      if (!backupDir || !fs.existsSync(backupDir) || allFiles.length === 0) {
         panel.webview.postMessage({
           command: 'backupListResult',
           success: true,
@@ -1417,8 +1435,6 @@ export class BatchTranslateOrganizeCommand {
         });
         return;
       }
-
-      const allFiles = fs.readdirSync(backupDir);
       let backups: any[] = [];
 
       if (type === 'source') {
@@ -1502,9 +1518,27 @@ export class BatchTranslateOrganizeCommand {
       const config = this.getConfig();
       const workspacePath = this.getWorkspacePath();
       const baseDir = path.join(workspacePath, config.translatePath);
-      const backupDir = path.join(baseDir, 'backups');
+      let backupDir: string;
+      let allFiles: string[] = [];
 
-      if (!fs.existsSync(backupDir)) {
+      if (type === 'source') {
+        // 获取源文件的备份
+        backupDir = path.join(baseDir, 'backups', 'source');
+        if (fs.existsSync(backupDir)) {
+          allFiles = fs.readdirSync(backupDir);
+        }
+      } else if (type === 'target') {
+        // 获取目标文件的备份
+        backupDir = path.join(baseDir, 'backups', 'target');
+        if (fs.existsSync(backupDir)) {
+          allFiles = fs.readdirSync(backupDir);
+        }
+      } else {
+        // 无效的类型，设置默认值
+        backupDir = path.join(baseDir, 'backups');
+      }
+
+      if (!backupDir || !fs.existsSync(backupDir) || allFiles.length === 0) {
         panel.webview.postMessage({
           command: 'cleanBackupListResult',
           success: true,
@@ -1514,7 +1548,6 @@ export class BatchTranslateOrganizeCommand {
         return;
       }
 
-      const allFiles = fs.readdirSync(backupDir);
       let backups: any[] = [];
 
       if (type === 'source') {
@@ -1609,8 +1642,8 @@ export class BatchTranslateOrganizeCommand {
       // 读取源文件内容
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
-      // 创建备份文件夹
-      const backupDir = path.join(workspacePath, config.translatePath, 'backups');
+      // 创建备份文件夹（源文件专用）
+      const backupDir = path.join(workspacePath, config.translatePath, 'backups', 'source');
       if (!fs.existsSync(backupDir)) {
         fs.mkdirSync(backupDir, { recursive: true });
       }
@@ -1659,8 +1692,8 @@ export class BatchTranslateOrganizeCommand {
       const targetFiles = this.getTargetFiles(baseDir, config.sourceFile, config.execFile);
       const results: any[] = [];
 
-      // 创建备份文件夹
-      const backupDir = path.join(baseDir, 'backups');
+      // 创建备份文件夹（目标文件专用）
+      const backupDir = path.join(baseDir, 'backups', 'target');
       if (!fs.existsSync(backupDir)) {
         fs.mkdirSync(backupDir, { recursive: true });
       }

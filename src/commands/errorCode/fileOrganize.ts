@@ -200,12 +200,19 @@ export class FileOrganizeCommand {
         backupCreated = true;
       }
 
-      // 读取源文件内容
-      const content = fs.readFileSync(sourceFilePath, 'utf8');
-      const organizedContent = this.organizeFileContent(content);
+      // 读取源文件内容，获取整理前的信息
+      const originalContent = fs.readFileSync(sourceFilePath, 'utf8');
+      const originalInfo = this.getFileInfo(originalContent);
+
+      // 整理内容
+      const organizedContent = this.organizeFileContent(originalContent);
 
       // 写回文件
       fs.writeFileSync(sourceFilePath, organizedContent, 'utf8');
+
+      // 重新读取整理后的文件内容，计算统计信息
+      const finalContent = fs.readFileSync(sourceFilePath, 'utf8');
+      const finalInfo = this.getFileInfo(finalContent);
 
       const message = backupCreated
         ? `源文件整理完成，已自动创建备份`
@@ -216,7 +223,14 @@ export class FileOrganizeCommand {
         success: true,
         message: message,
         file: sourceFile,
-        type: 'source'
+        type: 'source',
+        sourceInfo: {
+          name: sourceFile,
+          originalLines: originalInfo.lines,
+          organizedLines: finalInfo.lines,
+          originalKeys: originalInfo.keys.length,
+          organizedKeys: finalInfo.keys.length
+        }
       });
     } catch (error) {
       panel.webview.postMessage({
@@ -298,7 +312,9 @@ export class FileOrganizeCommand {
         originalKeys?: number,
         organizedKeys?: number,
         missingKeys?: number,
-        redundantKeys?: number
+        redundantKeys?: number,
+        missingKeyList?: Array<{ key: string, value: string }>,
+        redundantKeyList?: Array<{ key: string, value: string }>
       }> = [];
 
       for (const targetFile of targetFiles) {
@@ -316,13 +332,27 @@ export class FileOrganizeCommand {
           const content = fs.readFileSync(targetFile.path, 'utf8');
           const originalInfo = this.getFileInfo(content);
 
+          // 在整理前计算缺失和多余的键（基于原始内容）
+          const missingKeysResult = this.calculateMissingKeys(sourceInfo.keys, originalInfo.keys);
+          const redundantKeysResult = this.calculateRedundantKeys(sourceInfo.keys, originalInfo.keys);
+
           // 整理文件
           const organizedContent = this.organizeFileContent(content, sourceContent);
           const organizedInfo = this.getFileInfo(organizedContent);
 
-          // 计算缺失和多余的键
-          const missingKeys = this.calculateMissingKeys(sourceInfo.keys, organizedInfo.keys);
-          const redundantKeys = this.calculateRedundantKeys(sourceInfo.keys, organizedInfo.keys);
+          // 获取缺失键的值（从源文件）
+          const missingKeyList = missingKeysResult.keys.map(key => {
+            const sourceKeyIndex = sourceInfo.keys.indexOf(key);
+            const value = sourceKeyIndex >= 0 ? sourceInfo.values[sourceKeyIndex] : '';
+            return { key, value };
+          });
+
+          // 获取多余键的值（从原始目标文件）
+          const redundantKeyList = redundantKeysResult.keys.map(key => {
+            const targetKeyIndex = originalInfo.keys.indexOf(key);
+            const value = targetKeyIndex >= 0 ? originalInfo.values[targetKeyIndex] : '';
+            return { key, value };
+          });
 
           // 写回文件
           fs.writeFileSync(targetFile.path, organizedContent, 'utf8');
@@ -335,8 +365,10 @@ export class FileOrganizeCommand {
             organizedLines: organizedInfo.lines,
             originalKeys: originalInfo.keys.length,
             organizedKeys: organizedInfo.keys.length,
-            missingKeys: missingKeys,
-            redundantKeys: redundantKeys
+            missingKeys: missingKeysResult.count,
+            redundantKeys: redundantKeysResult.count,
+            missingKeyList: missingKeyList,
+            redundantKeyList: redundantKeyList
           });
         } catch (error) {
           results.push({
@@ -800,30 +832,41 @@ export class FileOrganizeCommand {
     return count;
   }
 
-  private getFileInfo(content: string): { lines: number, keys: string[] } {
+  private getFileInfo(content: string): { lines: number, keys: string[], values: string[] } {
     const lines = content.split('\n');
     const keys: string[] = [];
+    const values: string[] = [];
 
     for (const line of lines) {
       const trimmed = line.trim();
-      const match = trimmed.match(/^["']([^"']+)["']\s*:\s*["']/);
+      const match = trimmed.match(/^["']([^"']+)["']\s*:\s*["']([^"']*)["']/);
       if (match) {
         keys.push(match[1]);
+        values.push(match[2]);
       }
     }
 
     return {
       lines: lines.length,
-      keys: keys
+      keys: keys,
+      values: values
     };
   }
 
-  private calculateMissingKeys(sourceKeys: string[], targetKeys: string[]): number {
-    return sourceKeys.filter(key => !targetKeys.includes(key)).length;
+  private calculateMissingKeys(sourceKeys: string[], targetKeys: string[]): { count: number, keys: string[] } {
+    const missingKeys = sourceKeys.filter(key => !targetKeys.includes(key));
+    return {
+      count: missingKeys.length,
+      keys: missingKeys
+    };
   }
 
-  private calculateRedundantKeys(sourceKeys: string[], targetKeys: string[]): number {
-    return targetKeys.filter(key => !sourceKeys.includes(key)).length;
+  private calculateRedundantKeys(sourceKeys: string[], targetKeys: string[]): { count: number, keys: string[] } {
+    const redundantKeys = targetKeys.filter(key => !sourceKeys.includes(key));
+    return {
+      count: redundantKeys.length,
+      keys: redundantKeys
+    };
   }
 
   // 备份相关方法

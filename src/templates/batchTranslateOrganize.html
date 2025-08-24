@@ -866,6 +866,7 @@
     // 显示清理备份文件选择器
     function showCleanBackupSelector(type) {
       hideError();
+      currentCleanType = type; // 设置当前清理类型
       vscode.postMessage({ command: 'getCleanBackupList', type: type });
     }
 

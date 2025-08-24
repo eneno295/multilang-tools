@@ -99,6 +99,46 @@
       font-weight: bold;
     }
 
+    /* 翻译完成统计样式 */
+    .translation-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-button {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-button.success {
+      border-color: var(--vscode-focusBorder);
+    }
+
+    .stat-button.translate {
+      border-color: var(--vscode-notificationsInfoIcon-foreground);
+    }
+
+    .stat-button.failure {
+      border-color: var(--vscode-notificationsErrorIcon-foreground);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--vscode-textLink-foreground);
+      margin-bottom: 4px;
+    }
+
     .missing-details {
       margin-top: 10px;
       padding: 10px;
@@ -212,37 +252,7 @@
       display: none;
     }
 
-    .result-item {
-      margin: 10px 0;
-      padding: 10px;
-      background-color: var(--vscode-editor-background);
-      border-radius: 4px;
-      border-left: 4px solid var(--vscode-focusBorder);
-    }
-
-    .result-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 5px;
-    }
-
-    .result-status {
-      font-weight: bold;
-    }
-
-    .result-status.success {
-      color: var(--vscode-notificationsInfoIcon-foreground);
-    }
-
-    .result-status.error {
-      color: var(--vscode-notificationsErrorIcon-foreground);
-    }
-
-    .result-details {
-      font-size: 12px;
-      color: var(--vscode-descriptionForeground);
-    }
+    /* 删除不需要的详细结果样式 */
 
     .loading {
       text-align: center;
@@ -286,8 +296,22 @@
     </div>
 
     <div id="resultSection" class="result-section">
-      <h3>翻译结果</h3>
-      <div id="resultList"></div>
+      <h3>翻译完成统计</h3>
+      <div id="translationStats" class="translation-stats">
+        <div class="stat-button success">
+          <span class="stat-label">成功:</span>
+          <span class="stat-value" id="successCount">0/0 个文件</span>
+        </div>
+        <div class="stat-button translate">
+          <span class="stat-label">翻译:</span>
+          <span class="stat-value" id="translatedCount">0 个错误码</span>
+        </div>
+        <div class="stat-button failure">
+          <span class="stat-label">失败:</span>
+          <span class="stat-value" id="failureCount">0 个</span>
+        </div>
+      </div>
+      <!-- 删除详细结果列表，只保留精简统计 -->
     </div>
 
     <div id="loadingSection" class="loading" style="display: none;">正在分析文件结构，请稍候...</div>
@@ -378,6 +402,7 @@
 
         case 'translateResult':
           if (message.success) {
+            updateTranslationStats(message.results);
             displayTranslateResults(message.results);
           } else {
             showError(message.message);
@@ -519,32 +544,26 @@
       }
     }
 
-    // 显示翻译结果
+    // 隐藏进度
+    function hideProgress() {
+      document.getElementById('progressSection').style.display = 'none';
+    }
+
+    // 更新翻译统计信息
+    function updateTranslationStats(results) {
+      const totalFiles = results.length;
+      const successFiles = results.filter(r => r.success).length;
+      const failureFiles = results.filter(r => !r.success).length;
+      const totalTranslated = results.reduce((sum, r) => sum + (r.translated || 0), 0);
+
+      document.getElementById('successCount').textContent = `${successFiles}/${totalFiles} 个文件`;
+      document.getElementById('translatedCount').textContent = `${totalTranslated} 个错误码`;
+      document.getElementById('failureCount').textContent = `${failureFiles} 个`;
+    }
+
+    // 显示翻译结果（只显示统计信息，不显示详细列表）
     function displayTranslateResults(results) {
-      const container = document.getElementById('resultList');
-      let html = '';
-
-      results.forEach(result => {
-        const statusClass = result.success ? 'success' : 'error';
-        const statusText = result.success ? '翻译成功' : '翻译失败';
-
-        html += `
-          <div class="result-item">
-            <div class="result-header">
-              <span class="file-name">${result.file}</span>
-              <span class="result-status ${statusClass}">${statusText}</span>
-            </div>
-            <div class="result-details">
-              ${result.success ?
-            `成功翻译 ${result.translated} 个键` :
-            `翻译失败: ${result.error}`
-          }
-            </div>
-          </div>
-        `;
-      });
-
-      container.innerHTML = html;
+      // 只显示统计区域，不显示详细结果列表
       document.getElementById('resultSection').style.display = 'block';
     }
   </script>

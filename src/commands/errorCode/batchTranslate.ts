@@ -444,7 +444,8 @@ export class BatchTranslateCommand {
                 file: fileName,
                 code: missingCode.code,
                 translatedMessage: translationResult.text,
-                lineNumber: lineNumber
+                lineNumber: lineNumber,
+                translator: translationResult.service
               });
             }
           } else {
@@ -527,7 +528,7 @@ export class BatchTranslateCommand {
       const lineNumber = translatedCode.lineNumber;
 
       // 在对应行号插入新错误码
-      if (lineNumber > 0 && lineNumber < newLines.length) {
+      if (lineNumber > 0 && lineNumber <= newLines.length) {
         const insertLine = `  "${translatedCode.code}": "${translatedCode.message}",`;
         // lineNumber 是从1开始的行号，需要转换为从0开始的索引
         newLines.splice(lineNumber - 1, 0, insertLine);
