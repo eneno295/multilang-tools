@@ -442,20 +442,246 @@ export class FileOrganizeCommand {
   private organizeSourceFile(content: string): string {
     const lines = content.split('\n');
 
-    // 1. 解析文件结构，识别所有模块和错误码
-    const { sections, allErrorCodes } = this.parseSectionsAndCodes(lines);
+    // 1. 遍历所有错误码，组装成数组（包含注释和错误码）
+    const allItems = this.parseAllItems(lines);
 
-    // 2. 基于错误码语义分析，识别模块规则
-    const { moduleRules, misplacedCodes } = this.semanticAnalyzeErrorCodeDistribution(sections, allErrorCodes);
+    // 2. 识别每个模块的前缀规律（前四个字符）
+    const modulePrefixes = this.identifyModulePrefixRules(allItems);
 
-    // 3. 重新分配错误码到正确的模块
-    const reorganizedSections = this.reorganizeErrorCodes(sections, moduleRules, misplacedCodes);
+    // 3. 检查每个错误码是否在正确位置，重新分配
+    const reorganizedItems = this.reassignErrorCodesToCorrectModules(allItems, modulePrefixes);
 
-    // 4. 对每个模块内的错误码进行排序
-    this.sortSections(reorganizedSections);
+    // 4. 在每个模块内排序错误码
+    const sortedItems = this.sortErrorCodesWithinModules(reorganizedItems);
 
     // 5. 重建文件
-    return this.rebuildFile(reorganizedSections);
+    return this.rebuildFileFromItems(sortedItems);
+  }
+
+  /**
+   * 遍历所有行，组装成数组（包含注释和错误码）
+   */
+  private parseAllItems(lines: string[]): Array<{ type: 'header' | 'comment' | 'errorCode' | 'footer', content: string, code?: string, moduleIndex?: number }> {
+    const items: Array<{ type: 'header' | 'comment' | 'errorCode' | 'footer', content: string, code?: string, moduleIndex?: number }> = [];
+    let currentModuleIndex = -1;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // 检查是否是头部行（const errCode = {）
+      if (trimmed.includes('const errCode = {') || trimmed.includes('var errCode = {') || trimmed.includes('let errCode = {')) {
+        items.push({ type: 'header', content: line });
+        continue;
+      }
+
+      // 检查是否是结尾括号
+      if (trimmed === '}') {
+        items.push({ type: 'footer', content: line });
+        continue;
+      }
+
+      // 检查是否是注释行（模块开始）
+      if (trimmed.startsWith('//') && (trimmed.includes('模块') || trimmed.includes('报错'))) {
+        currentModuleIndex++;
+        items.push({ type: 'comment', content: line, moduleIndex: currentModuleIndex });
+        continue;
+      }
+
+      // 检查是否是错误码行
+      const match = trimmed.match(/^["'](\d+)["']\s*:\s*["']/);
+      if (match) {
+        items.push({
+          type: 'errorCode',
+          content: line,
+          code: match[1],
+          moduleIndex: currentModuleIndex
+        });
+        continue;
+      }
+
+      // 其他行（空行等）
+      if (trimmed.length > 0) {
+        items.push({ type: 'header', content: line });
+      }
+    }
+
+    return items;
+  }
+
+  /**
+   * 识别每个模块的前缀规律（前四个字符）
+   */
+  private identifyModulePrefixRules(items: Array<{ type: string, content: string, code?: string, moduleIndex?: number }>): Map<number, string[]> {
+    const modulePrefixes = new Map<number, string[]>();
+
+    // 按模块分组收集错误码
+    const moduleErrorCodes = new Map<number, string[]>();
+
+    for (const item of items) {
+      if (item.type === 'errorCode' && item.code && item.moduleIndex !== undefined) {
+        if (!moduleErrorCodes.has(item.moduleIndex)) {
+          moduleErrorCodes.set(item.moduleIndex, []);
+        }
+        moduleErrorCodes.get(item.moduleIndex)!.push(item.code);
+      }
+    }
+
+    // 分析每个模块的前缀规律
+    for (const [moduleIndex, codes] of moduleErrorCodes.entries()) {
+      const prefixes = new Set<string>();
+
+      for (const code of codes) {
+        // 提取前缀（前四个字符）
+        if (code.length >= 4) {
+          const prefix = code.substring(0, 4);
+          prefixes.add(prefix);
+        } else if (code.length >= 3) {
+          const prefix = code.substring(0, 3);
+          prefixes.add(prefix);
+        }
+      }
+
+      if (prefixes.size > 0) {
+        modulePrefixes.set(moduleIndex, Array.from(prefixes));
+      }
+    }
+
+    return modulePrefixes;
+  }
+
+  /**
+   * 检查每个错误码是否在正确位置，重新分配到正确模块
+   */
+  private reassignErrorCodesToCorrectModules(items: Array<{ type: string, content: string, code?: string, moduleIndex?: number }>, modulePrefixes: Map<number, string[]>): Array<{ type: string, content: string, code?: string, moduleIndex?: number }> {
+    const result = [...items];
+
+    // 找出所有错误码项
+    const errorCodeItems = result.filter(item => item.type === 'errorCode');
+
+    // 检查每个错误码是否在正确的模块
+    for (const errorCodeItem of errorCodeItems) {
+      if (!errorCodeItem.code || errorCodeItem.moduleIndex === undefined) continue;
+
+      const currentModuleIndex = errorCodeItem.moduleIndex;
+      const correctModuleIndex = this.findCorrectModuleIndex(errorCodeItem.code, modulePrefixes);
+
+      // 如果错误码在错误的模块，重新分配
+      if (correctModuleIndex !== -1 && correctModuleIndex !== currentModuleIndex) {
+        errorCodeItem.moduleIndex = correctModuleIndex;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * 根据错误码前缀找到正确的模块索引
+   * 优先选择前缀更"纯净"的模块（只有该前缀的模块）
+   */
+  private findCorrectModuleIndex(code: string, modulePrefixes: Map<number, string[]>): number {
+    const matchingModules: Array<{ moduleIndex: number, prefixCount: number }> = [];
+
+    // 找到所有匹配的模块
+    for (const [moduleIndex, prefixes] of modulePrefixes.entries()) {
+      for (const prefix of prefixes) {
+        if (code.startsWith(prefix)) {
+          matchingModules.push({ moduleIndex, prefixCount: prefixes.length });
+          break; // 一个模块只需要匹配一次
+        }
+      }
+    }
+
+    if (matchingModules.length === 0) {
+      return -1;
+    }
+
+    // 优先选择前缀数量少的模块（更"纯净"的模块）
+    matchingModules.sort((a, b) => a.prefixCount - b.prefixCount);
+    return matchingModules[0].moduleIndex;
+  }
+
+  /**
+   * 在每个模块内排序错误码
+   */
+  private sortErrorCodesWithinModules(items: Array<{ type: string, content: string, code?: string, moduleIndex?: number }>): Array<{ type: string, content: string, code?: string, moduleIndex?: number }> {
+    // 按模块分组错误码
+    const moduleErrorCodes = new Map<number, Array<{ type: string, content: string, code?: string, moduleIndex?: number }>>();
+
+    for (const item of items) {
+      if (item.type === 'errorCode' && item.moduleIndex !== undefined) {
+        if (!moduleErrorCodes.has(item.moduleIndex)) {
+          moduleErrorCodes.set(item.moduleIndex, []);
+        }
+        moduleErrorCodes.get(item.moduleIndex)!.push(item);
+      }
+    }
+
+    // 对每个模块内的错误码排序
+    for (const [moduleIndex, errorCodes] of moduleErrorCodes.entries()) {
+      errorCodes.sort((a, b) => {
+        const codeA = parseInt(a.code || '0');
+        const codeB = parseInt(b.code || '0');
+        return codeA - codeB;
+      });
+    }
+
+    return items;
+  }
+
+  /**
+   * 根据整理后的项目重建文件
+   */
+  private rebuildFileFromItems(items: Array<{ type: string, content: string, code?: string, moduleIndex?: number }>): string {
+    const result: string[] = [];
+
+    // 按模块重新组织
+    const modules = new Map<number, { comment: string, errorCodes: Array<{ content: string, code: string }> }>();
+    let headerLines: string[] = [];
+    let footerLines: string[] = [];
+
+    // 分组收集项目
+    for (const item of items) {
+      if (item.type === 'header') {
+        headerLines.push(item.content);
+      } else if (item.type === 'footer') {
+        footerLines.push(item.content);
+      } else if (item.type === 'comment' && item.moduleIndex !== undefined) {
+        if (!modules.has(item.moduleIndex)) {
+          modules.set(item.moduleIndex, { comment: item.content, errorCodes: [] });
+        } else {
+          modules.get(item.moduleIndex)!.comment = item.content;
+        }
+      } else if (item.type === 'errorCode' && item.moduleIndex !== undefined && item.code) {
+        if (!modules.has(item.moduleIndex)) {
+          modules.set(item.moduleIndex, { comment: '', errorCodes: [] });
+        }
+        modules.get(item.moduleIndex)!.errorCodes.push({ content: item.content, code: item.code });
+      }
+    }
+
+    // 重建文件
+    result.push(...headerLines);
+
+    // 按模块索引顺序添加模块
+    const sortedModuleIndexes = Array.from(modules.keys()).sort((a, b) => a - b);
+    for (const moduleIndex of sortedModuleIndexes) {
+      const module = modules.get(moduleIndex)!;
+
+      // 添加注释
+      if (module.comment) {
+        result.push(module.comment);
+      }
+
+      // 排序并添加错误码
+      module.errorCodes.sort((a, b) => parseInt(a.code) - parseInt(b.code));
+      for (const errorCode of module.errorCodes) {
+        result.push(errorCode.content);
+      }
+    }
+
+    result.push(...footerLines);
+
+    return result.join('\n');
   }
 
   private parseSectionsAndCodes(lines: string[]): { sections: Array<{ comment: string, errorCodes: Array<{ code: string, line: string }> }>, allErrorCodes: Array<{ code: string, line: string, section: string }> } {
