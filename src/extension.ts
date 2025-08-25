@@ -83,8 +83,6 @@ export function activate(context: vscode.ExtensionContext) {
     fileOrganize.execute();
   });
 
-
-
   // 批量翻译工具命令
   const batchConfigPathCommand = vscode.commands.registerCommand('multilang-tools.batchConfigPath', () => {
     batchTranslateConfig.execute();
