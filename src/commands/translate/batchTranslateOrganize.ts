@@ -878,70 +878,88 @@ export class BatchTranslateOrganizeCommand {
 
       // 遍历源文件的每个顶层键
       const sourceTopLevelKeys = Object.keys(sourceData);
+
       for (let k = 0; k < sourceTopLevelKeys.length; k++) {
         const topLevelKey = sourceTopLevelKeys[k];
         const isLastTopLevelKey = k === sourceTopLevelKeys.length - 1;
+        const sourceValue = sourceData[topLevelKey];
 
-        // 添加顶层键开始
-        organizedLines.push(`  "${topLevelKey}": {`);
-
-        // 获取源文件该键下的所有子键
-        const sourceSubKeys = sourceData[topLevelKey] ? Object.keys(sourceData[topLevelKey]) : [];
-
-        // 遍历源文件的每个子键
-        for (let i = 0; i < sourceSubKeys.length; i++) {
-          const sourceSubKey = sourceSubKeys[i];
-          const isLast = i === sourceSubKeys.length - 1;
-
-          // 检查目标文件是否有这个键
-          if (targetData[topLevelKey] && targetData[topLevelKey][sourceSubKey]) {
-            const targetValue = targetData[topLevelKey][sourceSubKey];
-
-            if (typeof targetValue === 'string') {
-              // 处理字符串值
-              let formattedValue = targetValue.replace(/\n/g, '\\n');
-              if (formattedValue.includes('"')) {
-                formattedValue = `"${formattedValue.replace(/"/g, '\\"')}"`;
-              } else {
-                formattedValue = `"${formattedValue}"`;
-              }
-              organizedLines.push(`    "${sourceSubKey}": ${formattedValue}${isLast ? '' : ','}`);
-            } else if (typeof targetValue === 'object' && targetValue !== null) {
-              // 处理嵌套对象
-              organizedLines.push(`    "${sourceSubKey}": {`);
-
-              const sourceNestedKeys = sourceData[topLevelKey][sourceSubKey] ? Object.keys(sourceData[topLevelKey][sourceSubKey]) : [];
-
-              // 遍历源文件的每个嵌套键
-              for (let j = 0; j < sourceNestedKeys.length; j++) {
-                const sourceNestedKey = sourceNestedKeys[j];
-                const isNestedLast = j === sourceNestedKeys.length - 1;
-
-                // 检查目标文件是否有这个嵌套键
-                if (targetValue[sourceNestedKey]) {
-                  const nestedValue = targetValue[sourceNestedKey];
-                  if (typeof nestedValue === 'string') {
-                    let formattedNestedValue = nestedValue.replace(/\n/g, '\\n');
-                    if (formattedNestedValue.includes('"')) {
-                      formattedNestedValue = `"${formattedNestedValue.replace(/"/g, '\\"')}"`;
-                    } else {
-                      formattedNestedValue = `"${formattedNestedValue}"`;
-                    }
-                    organizedLines.push(`      "${sourceNestedKey}": ${formattedNestedValue}${isNestedLast ? '' : ','}`);
-                  }
-                }
-              }
-
-              organizedLines.push(`    }${isLast ? '' : ','}`);
+        // 如果是字符串值（一层翻译结构），直接处理
+        if (typeof sourceValue === 'string') {
+          const targetValue = targetData[topLevelKey];
+          if (typeof targetValue === 'string') {
+            let formattedValue = targetValue.replace(/\n/g, '\\n');
+            if (formattedValue.includes('"')) {
+              formattedValue = `"${formattedValue.replace(/"/g, '\\"')}"`;
+            } else {
+              formattedValue = `"${formattedValue}"`;
             }
+            const line = `  "${topLevelKey}": ${formattedValue}${isLastTopLevelKey ? '' : ','}`;
+            organizedLines.push(line);
           }
+          continue; // 跳过后面的嵌套对象处理
         }
 
-        // 结束顶层键
-        if (isLastTopLevelKey) {
-          organizedLines.push('  }'); // 最后一个顶层键，不加逗号
-        } else {
-          organizedLines.push('  },'); // 不是最后一个顶层键，加逗号
+        // 如果是对象值（嵌套结构），处理嵌套对象
+        if (typeof sourceValue === 'object' && sourceValue !== null) {
+          // 添加顶层键开始
+          organizedLines.push(`  "${topLevelKey}": {`);
+
+          // 获取子键
+          const sourceSubKeys = Object.keys(sourceValue);
+
+          // 遍历源文件的每个子键
+          for (let i = 0; i < sourceSubKeys.length; i++) {
+            const sourceSubKey = sourceSubKeys[i];
+            const isLast = i === sourceSubKeys.length - 1;
+
+            // 检查目标文件是否有这个键
+            if (targetData[topLevelKey] && targetData[topLevelKey][sourceSubKey]) {
+              const targetValue = targetData[topLevelKey][sourceSubKey];
+
+              if (typeof targetValue === 'string') {
+                // 处理字符串值
+                let formattedValue = targetValue.replace(/\n/g, '\\n');
+                if (formattedValue.includes('"')) {
+                  formattedValue = `"${formattedValue.replace(/"/g, '\\"')}"`;
+                } else {
+                  formattedValue = `"${formattedValue}"`;
+                }
+                organizedLines.push(`    "${sourceSubKey}": ${formattedValue}${isLast ? '' : ','}`);
+              } else if (typeof targetValue === 'object' && targetValue !== null) {
+                // 处理嵌套对象
+                organizedLines.push(`    "${sourceSubKey}": {`);
+
+                const sourceNestedKeys = sourceData[topLevelKey][sourceSubKey] ? Object.keys(sourceData[topLevelKey][sourceSubKey]) : [];
+
+                // 遍历源文件的每个嵌套键
+                for (let j = 0; j < sourceNestedKeys.length; j++) {
+                  const sourceNestedKey = sourceNestedKeys[j];
+                  const isNestedLast = j === sourceNestedKeys.length - 1;
+
+                  // 检查目标文件是否有这个嵌套键
+                  if (targetValue[sourceNestedKey]) {
+                    const nestedValue = targetValue[sourceNestedKey];
+                    if (typeof nestedValue === 'string') {
+                      let formattedNestedValue = nestedValue.replace(/\n/g, '\\n');
+                      if (formattedNestedValue.includes('"')) {
+                        formattedNestedValue = `"${formattedNestedValue.replace(/"/g, '\\"')}"`;
+                      } else {
+                        formattedNestedValue = `"${formattedNestedValue}"`;
+                      }
+                      organizedLines.push(`      "${sourceNestedKey}": ${formattedNestedValue}${isNestedLast ? '' : ','}`);
+                    }
+                  }
+                }
+
+                organizedLines.push(`    }${isLast ? '' : ','}`);
+              }
+            }
+          }
+
+          // 结束嵌套对象 - 如果后面还有同级键，需要加逗号
+          const hasMoreSiblingKeys = k < sourceTopLevelKeys.length - 1;
+          organizedLines.push(`  }${hasMoreSiblingKeys ? ',' : ''}`);
         }
       }
 
