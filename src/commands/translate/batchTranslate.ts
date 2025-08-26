@@ -438,8 +438,8 @@ export class BatchTranslateTranslateCommand {
    * @param content 文件内容
    * @returns 翻译项数组
    */
-  private parseTranslations(content: string): Array<{ key: string, value: string }> {
-    const translations: Array<{ key: string, value: string }> = [];
+  private parseTranslations(content: string): Array<{ key: string, finalKey: string, value: string }> {
+    const translations: Array<{ key: string, finalKey: string, value: string }> = [];
 
     try {
       // 清理注释
@@ -455,14 +455,16 @@ export class BatchTranslateTranslateCommand {
 
       const parsed = new Function('return (' + cleanContent + ')')();
 
-      // 递归提取所有键值对，只保留最终键名
+      // 递归提取所有键值对，保留完整路径和最终键名
       const extractKeyValues = (obj: any, prefix: string = '') => {
         if (typeof obj === 'object' && obj !== null) {
           for (const key in obj) {
             if (typeof obj[key] === 'string') {
-              // 只保留最终键名，不包含完整路径
+              // 保留完整路径，包含所有层级
+              const fullKey = prefix ? `${prefix}.${key}` : key;
               translations.push({
-                key: key,
+                key: fullKey,        // 完整路径，用于查找缺失
+                finalKey: key,       // 最终键名，用于添加翻译
                 value: obj[key]
               });
             } else if (typeof obj[key] === 'object' && obj[key] !== null) {
@@ -491,7 +493,7 @@ export class BatchTranslateTranslateCommand {
    * @returns 翻译结果
    */
   private async translateFile(
-    sourceTranslations: Array<{ key: string, value: string }>,
+    sourceTranslations: Array<{ key: string, finalKey: string, value: string }>,
     targetFilePath: string,
     targetLanguage: string,
     translationService: string,
@@ -513,7 +515,7 @@ export class BatchTranslateTranslateCommand {
       const existingKeys = new Set(existingTranslations.map(item => item.key));
 
       // 找出缺少的翻译
-      const missingTranslations: Array<{ key: string, value: string }> = [];
+      const missingTranslations: Array<{ key: string, finalKey: string, value: string }> = [];
 
       for (const sourceItem of sourceTranslations) {
         if (!existingKeys.has(sourceItem.key)) {
@@ -539,7 +541,7 @@ export class BatchTranslateTranslateCommand {
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
       // 翻译缺少的翻译项
-      const translatedItems: Array<{ key: string, value: string, lineNumber: number }> = [];
+      const translatedItems: Array<{ key: string, finalKey: string, value: string, lineNumber: number }> = [];
       let translatedCount = 0;
       const errors: string[] = [];
 
@@ -558,6 +560,7 @@ export class BatchTranslateTranslateCommand {
 
             translatedItems.push({
               key: missingItem.key,
+              finalKey: missingItem.finalKey,
               value: translationResult.text,
               lineNumber: lineNumber
             });
@@ -644,7 +647,7 @@ export class BatchTranslateTranslateCommand {
    * @param translatedItems 翻译项列表
    * @returns 更新后的内容
    */
-  private updateTargetFileWithLineNumber(content: string, translatedItems: Array<{ key: string, value: string, lineNumber: number }>): string {
+  private updateTargetFileWithLineNumber(content: string, translatedItems: Array<{ key: string, finalKey: string, value: string, lineNumber: number }>): string {
     // 如果文件为空，创建新的翻译对象
     if (!content.trim()) {
       const translationsText = translatedItems
@@ -665,18 +668,66 @@ export class BatchTranslateTranslateCommand {
 
       // 在对应行号插入新翻译
       if (lineNumber > 0 && lineNumber < newLines.length) {
-        // 获取附近行的缩进，用一样的缩进
-        const nearbyLine = lines[lineNumber - 1];
-        const indentMatch = nearbyLine.match(/^(\s*)/);
-        const indent = indentMatch ? indentMatch[1] : '  ';
+        // 根据嵌套层级计算正确的缩进
+        const correctIndent = this.calculateCorrectIndent(translatedItem.key, lines, lineNumber);
 
-        const insertLine = `${indent}"${translatedItem.key}": "${translatedItem.value}",`;
+        const insertLine = `${correctIndent}"${translatedItem.finalKey}": "${translatedItem.value}",`;
         // lineNumber 是从1开始的行号，需要转换为从0开始的索引
         newLines.splice(lineNumber - 1, 0, insertLine);
       }
     }
 
     return newLines.join('\n');
+  }
+
+  /**
+   * 计算正确的缩进
+   * @param fullKey 完整的键路径（如 active.salary.fenglu）
+   * @param lines 文件的所有行
+   * @param lineNumber 插入位置的行号
+   * @returns 正确的缩进字符串
+   */
+  private calculateCorrectIndent(fullKey: string, lines: string[], lineNumber: number): string {
+    // 计算嵌套层级（点号的数量 + 1）
+    const nestingLevel = fullKey.split('.').length;
+
+    // 智能检测基础缩进单位
+    const baseIndent = this.detectBaseIndent(lines);
+
+    // 根据嵌套层级计算缩进
+    // 第1层：baseIndent，第2层：baseIndent*2，第3层：baseIndent*3
+    const indent = baseIndent.repeat(nestingLevel);
+
+    return indent;
+  }
+
+  /**
+   * 检测文件的基础缩进
+   * 获取第一个变量的缩进作为默认缩进
+   * @param lines 文件的所有行
+   * @returns 基础缩进字符串
+   */
+  private detectBaseIndent(lines: string[]): string {
+    for (const line of lines) {
+      // 跳过空行、注释行和 export default
+      if (line.trim() === '' ||
+        line.trim().startsWith('//') ||
+        line.trim().startsWith('/*') ||
+        line.trim() === 'export default {' ||
+        line.trim() === '};') {
+        continue;
+      }
+
+      // 获取行首缩进
+      const indentMatch = line.match(/^(\s+)/);
+      if (indentMatch) {
+        const indent = indentMatch[1];
+        // 返回第一个找到的缩进作为基础缩进
+        return indent;
+      }
+    }
+
+    return '  '; // 默认使用2个空格
   }
 
   /**
