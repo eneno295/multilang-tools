@@ -169,6 +169,5 @@
     "@types/node": "16.x",
     "@types/vscode": "^1.74.0",
     "typescript": "^5.0.0"
-  },
-  "dependencies": {}
+  }
 }

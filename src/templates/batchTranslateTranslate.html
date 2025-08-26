@@ -222,9 +222,16 @@
     }
 
     .translator-icon {
-      width: 16px;
-      height: 16px;
-      object-fit: contain;
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      line-height: 20px;
+      text-align: center;
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: bold;
     }
 
     .progress-status {
@@ -447,16 +454,15 @@
       document.getElementById('checkResults').style.display = 'block';
     }
 
-    // 翻译工具图标映射
-    const translatorIcons = {
-      'google': '../resources/google.png',
-      'mymemory': '../resources/myMemory.png',
-      'default': '../resources/icon.png'
-    };
-
-    // 获取翻译工具图标
-    function getTranslatorIcon(translator) {
-      return translatorIcons[translator] || translatorIcons.default;
+    // 获取翻译工具文字标识
+    function getTranslatorText(translator) {
+      if (translator === 'google') {
+        return 'G';
+      } else if (translator === 'mymemory') {
+        return 'M';
+      } else {
+        return '?';
+      }
     }
 
     // 处理翻译进度
@@ -491,10 +497,9 @@
           if (fileContent) {
             const successItem = document.createElement('div');
             successItem.className = 'progress-item';
-            const translatorIcon = getTranslatorIcon(message.translator);
             successItem.innerHTML = `
               <div class="translation-content">
-                <img src="${translatorIcon}" alt="${message.translator}" class="translator-icon" />
+                <span class="translator-icon">${getTranslatorText(message.translator || 'default')}</span>
                 <span class="key-name">${message.code}:</span>
                 <span class="progress-details">${message.translatedValue}</span>
               </div>

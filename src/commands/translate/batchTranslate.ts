@@ -73,9 +73,12 @@ export class BatchTranslateTranslateCommand {
     const files: Array<{ name: string, path: string }> = [];
 
     if (execFile === 'all') {
-      // 如果配置为 'all'，则包含所有 .ts 文件（除了源文件）
+      // 如果配置为 'all'，则包含所有支持的文件（除了源文件）
       return fs.readdirSync(baseDir)
-        .filter(file => file.endsWith('.ts') && file !== sourceFile)
+        .filter(file => {
+          const isSupportedFile = file.endsWith('.ts') || file.endsWith('.js') || file.endsWith('.json');
+          return isSupportedFile && file !== sourceFile;
+        })
         .map(file => ({
           name: file,
           path: path.join(baseDir, file)
@@ -435,6 +438,7 @@ export class BatchTranslateTranslateCommand {
 
   /**
    * 解析翻译文件内容
+   * 支持 .ts, .js, .json 文件格式
    * @param content 文件内容
    * @returns 翻译项数组
    */
@@ -442,18 +446,45 @@ export class BatchTranslateTranslateCommand {
     const translations: Array<{ key: string, finalKey: string, value: string }> = [];
 
     try {
-      // 清理注释
-      let cleanContent = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-
-      // 如果包含 export default，提取对象部分
-      if (cleanContent.includes('export default')) {
-        const match = cleanContent.match(/export\s+default\s*(\{[\s\S]*\})/);
-        if (match) {
-          cleanContent = match[1];
-        }
+      // 清理注释（仅对 .ts 和 .js 文件）
+      let cleanContent = content;
+      if (content.includes('//') || content.includes('/*')) {
+        cleanContent = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
       }
 
-      const parsed = new Function('return (' + cleanContent + ')')();
+      let parsed: any;
+
+      // 尝试解析为 JSON 格式
+      try {
+        parsed = JSON.parse(cleanContent);
+      } catch (jsonError) {
+        // 如果不是 JSON，尝试解析为 JavaScript/TypeScript 模块
+        try {
+          let jsContent = cleanContent;
+
+          // 如果包含 export default，提取对象部分
+          if (jsContent.includes('export default')) {
+            const match = jsContent.match(/export\s+default\s*(\{[\s\S]*\})/);
+            if (match) {
+              jsContent = match[1];
+            }
+          }
+
+          // 如果包含 module.exports，提取对象部分
+          if (jsContent.includes('module.exports')) {
+            const match = jsContent.match(/module\.exports\s*=\s*(\{[\s\S]*\})/);
+            if (match) {
+              jsContent = match[1];
+            }
+          }
+
+          // 尝试解析为 JavaScript 对象
+          parsed = new Function('return (' + jsContent + ')')();
+        } catch (jsError) {
+          console.error('解析文件失败:', { jsonError, jsError });
+          return translations;
+        }
+      }
 
       // 递归提取所有键值对，保留完整路径和最终键名
       const extractKeyValues = (obj: any, prefix: string = '') => {
@@ -620,13 +651,20 @@ export class BatchTranslateTranslateCommand {
 
       // 更新目标文件，在对应行号插入
       if (translatedItems.length > 0) {
-        const updatedContent = this.updateTargetFileWithLineNumber(targetContent, translatedItems);
+        let updatedContent = this.updateTargetFileWithLineNumber(targetContent, translatedItems);
+
+        // 在所有翻译添加完成后，清理多余的逗号
+        updatedContent = this.cleanupTrailingCommas(updatedContent);
+
         fs.writeFileSync(targetFilePath, updatedContent, 'utf-8');
       }
 
+      // 判断整体是否成功：如果有错误或者没有成功翻译任何项，则认为失败
+      const overallSuccess = errors.length === 0 && translatedCount > 0;
+
       return {
         file: fileName,
-        success: true,
+        success: overallSuccess,
         translated: translatedCount,
         errors: errors
       };
@@ -643,16 +681,19 @@ export class BatchTranslateTranslateCommand {
 
   /**
    * 更新目标文件，在对应行号插入翻译
+   * 支持 .ts, .js, .json 文件格式
    * @param content 目标文件内容
    * @param translatedItems 翻译项列表
    * @returns 更新后的内容
    */
   private updateTargetFileWithLineNumber(content: string, translatedItems: Array<{ key: string, finalKey: string, value: string, lineNumber: number }>): string {
-    // 如果文件为空，创建新的翻译对象
+    // 如果文件为空，根据文件类型创建新的翻译对象
     if (!content.trim()) {
       const translationsText = translatedItems
         .map(item => `  "${item.key}": "${item.value}"`)
         .join(',\n');
+
+      // 默认使用 export default 格式（适用于 .ts 和 .js）
       return `export default {\n${translationsText}\n};`;
     }
 
@@ -672,6 +713,17 @@ export class BatchTranslateTranslateCommand {
         const correctIndent = this.calculateCorrectIndent(translatedItem.key, lines, lineNumber);
 
         const insertLine = `${correctIndent}"${translatedItem.finalKey}": "${translatedItem.value}",`;
+
+        // 检查前一行是否需要添加逗号
+        const prevLineIndex = lineNumber - 2; // 前一行（从0开始）
+        if (prevLineIndex >= 0 && prevLineIndex < newLines.length) {
+          const prevLine = newLines[prevLineIndex];
+          // 如果前一行是键值对且没有逗号，添加逗号
+          if (prevLine.includes(':') && !prevLine.trim().endsWith(',') && !prevLine.trim().endsWith('{') && !prevLine.trim().endsWith('}')) {
+            newLines[prevLineIndex] = prevLine + ',';
+          }
+        }
+
         // lineNumber 是从1开始的行号，需要转换为从0开始的索引
         newLines.splice(lineNumber - 1, 0, insertLine);
       }
@@ -731,25 +783,62 @@ export class BatchTranslateTranslateCommand {
   }
 
   /**
-   * 根据文件名获取语言代码
+   * 根据文件名智能识别语言代码
    * @param fileName 文件名
    * @returns 语言代码
    */
   private getLanguageFromFileName(fileName: string): string {
-    // 根据文件名映射到语言代码
-    const languageMap: { [key: string]: string } = {
-      'en-US.ts': 'en',
-      'es-ES.ts': 'es',
-      'hi-IN.ts': 'hi',
-      'id-ID.ts': 'id',
-      'ja-JP.ts': 'ja',
-      'ms-MY.ts': 'ms',
-      'pt-BR.ts': 'pt',
-      'th-TH.ts': 'th',
-      'vi-VN.ts': 'vi'
-    };
+    // 移除文件扩展名
+    const nameWithoutExt = fileName.replace(/\.(ts|js|json)$/, '');
 
-    return languageMap[fileName] || 'en';
+    // 智能语言识别规则
+    const languagePatterns = [
+      // 标准格式：en-US, zh-CN, es-ES 等
+      { pattern: /^([a-z]{2})-([A-Z]{2})$/i, language: (match: RegExpMatchArray) => match[1].toLowerCase() },
+
+      // 简化格式：EN, CN, ES 等
+      {
+        pattern: /^([A-Z]{2})$/i, language: (match: RegExpMatchArray) => {
+          const code = match[1].toLowerCase();
+          // 特殊处理：PH -> tl (菲律宾语应该使用 tl 而不是 ph)
+          if (code === 'ph') return 'tl';
+          return code;
+        }
+      },
+
+      // 全名格式：english, chinese, spanish 等
+      {
+        pattern: /^(english|chinese|spanish|french|german|japanese|korean|russian|portuguese|italian|dutch|arabic|hindi|thai|vietnamese|indonesian|malay|filipino|tagalog)$/i,
+        language: (match: RegExpMatchArray) => {
+          const langMap: { [key: string]: string } = {
+            'english': 'en', 'chinese': 'zh', 'spanish': 'es', 'french': 'fr', 'german': 'de',
+            'japanese': 'ja', 'korean': 'ko', 'russian': 'ru', 'portuguese': 'pt', 'italian': 'it',
+            'dutch': 'nl', 'arabic': 'ar', 'hindi': 'hi', 'thai': 'th', 'vietnamese': 'vi',
+            'indonesian': 'id', 'malay': 'ms', 'filipino': 'tl', 'tagalog': 'tl'
+          };
+          return langMap[match[1].toLowerCase()] || 'en';
+        }
+      }
+    ];
+
+    // 尝试匹配语言模式
+    for (const langPattern of languagePatterns) {
+      const match = nameWithoutExt.match(langPattern.pattern);
+      if (match) {
+        return langPattern.language(match);
+      }
+    }
+
+    // 如果都没匹配到，尝试从文件名中提取语言信息
+    const commonLanguages = ['en', 'zh', 'es', 'fr', 'de', 'ja', 'ko', 'ru', 'pt', 'it', 'nl', 'ar', 'hi', 'th', 'vi', 'id', 'ms', 'tl'];
+    for (const lang of commonLanguages) {
+      if (nameWithoutExt.toLowerCase().includes(lang)) {
+        return lang;
+      }
+    }
+
+    // 默认返回英语
+    return 'en';
   }
 
   /**
@@ -772,5 +861,52 @@ export class BatchTranslateTranslateCommand {
       }
     }
     return 1; // 如果没找到，返回第1行而不是0
+  }
+
+  /**
+   * 清理多余的逗号
+   * 去掉对象最后一个参数的逗号
+   * @param content 文件内容
+   * @returns 清理后的内容
+   */
+  private cleanupTrailingCommas(content: string): string {
+    const lines = content.split('\n');
+    const newLines = [...lines];
+
+    // 从后往前遍历，找到对象结构
+    for (let i = newLines.length - 1; i >= 0; i--) {
+      const line = newLines[i].trim();
+
+      // 如果遇到对象结束，检查前面的行
+      if (line.startsWith('}') || line.startsWith('},')) {
+        // 向前查找最后一个键值对
+        for (let j = i - 1; j >= 0; j--) {
+          const prevLine = newLines[j].trim();
+
+          // 如果遇到对象开始，停止查找
+          if (prevLine.startsWith('{') || prevLine.startsWith('{,')) {
+            break;
+          }
+
+          // 如果遇到键值对且有逗号，去掉逗号
+          if (prevLine.includes(':') && prevLine.endsWith(',')) {
+            // 去掉行尾的逗号
+            newLines[j] = newLines[j].replace(/,$/, '');
+            console.log(`清理多余逗号: 第${j + 1}行 "${prevLine}" -> "${newLines[j].trim()}"`);
+            break;
+          }
+
+          // 如果遇到空行或注释，继续查找
+          if (prevLine === '' || prevLine.startsWith('//') || prevLine.startsWith('/*')) {
+            continue;
+          }
+
+          // 如果遇到其他内容，停止查找
+          break;
+        }
+      }
+    }
+
+    return newLines.join('\n');
   }
 } 
