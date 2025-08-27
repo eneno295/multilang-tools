@@ -349,7 +349,12 @@ export class BatchTranslateOrganizeCommand {
 
           // 按照源文件结构重新组织目标文件
           const organizedContent = this.organizeTargetFile(sourceContent, targetContent);
-          const organizedKeys = this.countKeys(organizedContent);
+
+          // 统计整理后的键数时，需要清理 export default 前缀
+          const cleanOrganizedContent = organizedContent
+            .replace(/^export\s+default\s*/, '')
+            .replace(/;$/, '');
+          const organizedKeys = this.countKeys(cleanOrganizedContent);
           const organizedLines = organizedContent.split('\n').length;
 
           // 计算统计信息并获取具体的键值对信息
@@ -719,19 +724,50 @@ export class BatchTranslateOrganizeCommand {
    */
   private countKeys(content: string): number {
     try {
-      // 清理文件内容，移除 export default 和结尾分号
-      const cleanContent = content
-        .replace(/export\s+default\s*/, '')
-        .replace(/;$/, '');
+      // 完全清理文件内容，确保没有 export 和分号
+      let cleanContent = content;
 
-      // 标准化模板字符串，然后解析为对象
-      const normalized = this.normalizeTemplateLiterals(cleanContent);
-      const structure = new Function('return (' + normalized + ')')();
+      // 移除 export default
+      if (cleanContent.includes('export default')) {
+        const match = cleanContent.match(/export\s+default\s*(\{[\s\S]*\})/);
+        if (match) {
+          cleanContent = match[1];
+        } else {
+          cleanContent = cleanContent.replace(/export\s+default\s*/, '');
+        }
+      }
+
+      // 移除末尾的分号
+      cleanContent = cleanContent.replace(/;$/, '');
+
+      // 确保内容以 { 开始，以 } 结束
+      if (!cleanContent.trim().startsWith('{')) {
+        cleanContent = '{' + cleanContent;
+      }
+      if (!cleanContent.trim().endsWith('}')) {
+        cleanContent = cleanContent + '}';
+      }
+
+      // 尝试使用 new Function 解析，如果失败则使用 eval
+      let structure;
+      try {
+        // 标准化模板字符串，然后尝试 new Function
+        const normalized = this.normalizeTemplateLiterals(cleanContent);
+        structure = new Function('return (' + normalized + ')')();
+      } catch (funcError) {
+        // 如果 new Function 失败，使用 eval 作为后备方案
+        try {
+          structure = eval(`(${cleanContent})`);
+        } catch (evalError) {
+          // 如果 eval 也失败，抛出错误
+          throw new Error(`解析失败: new Function 和 eval 都失败了`);
+        }
+      }
 
       // 递归统计键数
       return this.countKeysRecursive(structure);
     } catch (error) {
-      // 解析失败时返回 0
+      console.error('解析翻译文件失败:', error);
       return 0;
     }
   }
@@ -780,14 +816,45 @@ export class BatchTranslateOrganizeCommand {
    */
   private parseTranslationStructure(content: string): any {
     try {
-      // 清理文件内容，移除 export default 和结尾分号
-      const cleanContent = content
-        .replace(/export\s+default\s*/, '')
-        .replace(/;$/, '');
+      // 完全清理文件内容，确保没有 export 和分号
+      let cleanContent = content;
 
-      // 标准化模板字符串，然后解析为对象
-      const normalized = this.normalizeTemplateLiterals(cleanContent);
-      const structure = new Function('return (' + normalized + ')')();
+      // 移除 export default
+      if (cleanContent.includes('export default')) {
+        const match = cleanContent.match(/export\s+default\s*(\{[\s\S]*\})/);
+        if (match) {
+          cleanContent = match[1];
+        } else {
+          cleanContent = cleanContent.replace(/export\s+default\s*/, '');
+        }
+      }
+
+      // 移除末尾的分号
+      cleanContent = cleanContent.replace(/;$/, '');
+
+      // 确保内容以 { 开始，以 } 结束
+      if (!cleanContent.trim().startsWith('{')) {
+        cleanContent = '{' + cleanContent;
+      }
+      if (!cleanContent.trim().endsWith('}')) {
+        cleanContent = cleanContent + '}';
+      }
+
+      // 尝试使用 new Function 解析，如果失败则使用 eval
+      let structure;
+      try {
+        // 标准化模板字符串，然后尝试 new Function
+        const normalized = this.normalizeTemplateLiterals(cleanContent);
+        structure = new Function('return (' + normalized + ')')();
+      } catch (funcError) {
+        // 如果 new Function 失败，使用 eval 作为后备方案
+        try {
+          structure = eval(`(${cleanContent})`);
+        } catch (evalError) {
+          // 如果 eval 也失败，抛出错误
+          throw new Error(`解析失败: new Function 和 eval 都失败了`);
+        }
+      }
       return structure;
     } catch (error) {
       throw new Error(`解析文件结构失败: ${error}`);
@@ -924,11 +991,44 @@ export class BatchTranslateOrganizeCommand {
    */
   private parseFileData(content: string): any {
     try {
-      const cleanContent = content
-        .replace(/export\s+default\s*/, '')
-        .replace(/;$/, '');
+      // 完全清理文件内容，确保没有 export 和分号
+      let cleanContent = content;
 
-      const parsed = new Function('return (' + cleanContent + ')')();
+      // 移除 export default
+      if (cleanContent.includes('export default')) {
+        const match = cleanContent.match(/export\s+default\s*(\{[\s\S]*\})/);
+        if (match) {
+          cleanContent = match[1];
+        } else {
+          cleanContent = cleanContent.replace(/export\s+default\s*/, '');
+        }
+      }
+
+      // 移除末尾的分号
+      cleanContent = cleanContent.replace(/;$/, '');
+
+      // 确保内容以 { 开始，以 } 结束
+      if (!cleanContent.trim().startsWith('{')) {
+        cleanContent = '{' + cleanContent;
+      }
+      if (!cleanContent.trim().endsWith('}')) {
+        cleanContent = cleanContent + '}';
+      }
+
+      // 尝试使用 new Function 解析，如果失败则使用 eval
+      let parsed;
+      try {
+        const normalized = this.normalizeTemplateLiterals(cleanContent);
+        parsed = new Function('return (' + normalized + ')')();
+      } catch (funcError) {
+        // 如果 new Function 失败，使用 eval 作为后备方案
+        try {
+          parsed = eval(`(${cleanContent})`);
+        } catch (evalError) {
+          // 如果 eval 也失败，抛出错误
+          throw new Error(`解析失败: new Function 和 eval 都失败了`);
+        }
+      }
       return parsed;
     } catch (error) {
       console.error('解析文件失败:', error);
@@ -1605,15 +1705,63 @@ export class BatchTranslateOrganizeCommand {
 
       // 如果包含 export default，提取对象部分
       if (cleanContent.includes('export default')) {
+        // 使用与 parseFileData 相同的解析逻辑
         const match = cleanContent.match(/export\s+default\s*(\{[\s\S]*\})/);
         if (match) {
           cleanContent = match[1];
+        } else {
+          cleanContent = cleanContent.replace(/export\s+default\s*/, '');
         }
       }
 
+      // 移除末尾的分号
+      cleanContent = cleanContent.replace(/;$/, '');
 
+      // 确保内容以 { 开始，以 } 结束
+      if (!cleanContent.trim().startsWith('{')) {
+        cleanContent = '{' + cleanContent;
+      }
+      if (!cleanContent.trim().endsWith('}')) {
+        cleanContent = cleanContent + '}';
+      }
 
-      const parsed = new Function('return (' + cleanContent + ')')();
+      // 使用更强大的解析策略
+      let parsed;
+      try {
+        // 方法1: 使用 normalizeTemplateLiterals + new Function
+        const normalized = this.normalizeTemplateLiterals(cleanContent);
+        parsed = new Function('return (' + normalized + ')')();
+      } catch (funcError) {
+        try {
+          // 方法2: 直接使用 eval
+          parsed = eval(`(${cleanContent})`);
+        } catch (evalError) {
+          try {
+            // 方法3: 尝试清理更多可能的语法问题
+            let ultraCleanContent = cleanContent
+              .replace(/[\u200B-\u200D\uFEFF]/g, '') // 移除零宽字符
+              .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除控制字符
+              .trim();
+
+            parsed = eval(`(${ultraCleanContent})`);
+          } catch (ultraEvalError) {
+            // 方法4: 最后的尝试 - 使用 JSON.parse（如果可能）
+            try {
+              // 尝试将内容转换为有效的 JSON 格式
+              let jsonContent = cleanContent
+                .replace(/[\u200B-\u200D\uFEFF]/g, '') // 移除零宽字符
+                .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除控制字符
+                .replace(/(\w+):/g, '"$1":') // 确保键名有引号
+                .replace(/'/g, '"') // 替换单引号为双引号
+                .trim();
+
+              parsed = JSON.parse(jsonContent);
+            } catch (jsonError) {
+              throw new Error(`所有解析方法都失败了: new Function, eval, 清理后eval, JSON.parse`);
+            }
+          }
+        }
+      }
 
       const keyValues: Array<{ key: string, value: string }> = [];
 
