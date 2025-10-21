@@ -27,10 +27,29 @@ VSCode 多语言开发辅助工具，支持错误码管理、批量翻译、文�
 
 ## 安装
 
+### 从 VSCode 市场安装（推荐）
+
 1. 打开 VSCode
 2. 按 `Ctrl+Shift+X` (Windows/Linux) 或 `Cmd+Shift+X` (Mac) 打开扩展面板
-3. 搜索 "多语言开发工具"
+3. 搜索 "多语言开发工具" 或 "multilang-tools"
 4. 点击安装
+
+### 本地安装
+
+#### 方法一：通过 VSCode 界面安装
+
+1. 从 [Releases](https://github.com/eneno295/multilang-tools/releases) 下载最新的 `.vsix` 文件
+2. 打开 VSCode
+3. 按 `Ctrl+Shift+X` (Windows/Linux) 或 `Cmd+Shift+X` (Mac) 打开扩展面板
+4. 点击扩展面板右上角的 `...` 菜单
+5. 选择 "从 VSIX 安装..." (Install from VSIX...)
+6. 选择下载的 `.vsix` 文件
+
+#### 方法二：通过命令行安装
+
+```bash
+code --install-extension multilang-tools-0.1.5.vsix
+```
 
 ## 使用方法
 
