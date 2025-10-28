@@ -7,10 +7,45 @@ export async function googleTranslate(text: string, targetLang = 'en', sourceLan
   return await myMemoryTranslate(text, targetLang, sourceLang);
 }
 
+// MyMemory 支持的语言代码映射
+function mapToMyMemoryLangCode(langCode: string): string {
+  const lowerCode = langCode.toLowerCase();
+
+  // 特殊语言代码映射（基于验证测试结果）
+  const langMapping: { [key: string]: string } = {
+    'zh-cn': 'zh-CN',
+    'zh': 'zh-CN',
+    // 菲律宾语：优先使用 tl-PH 格式（RFC3066 标准）
+    'tl': 'tl-PH',        // Tagalog -> Tagalog (Philippines) ✓
+    'fil': 'fil',         // Filipino (小写) ✓
+    'tagalog': 'tl-PH',   // 全名映射
+    'filipino': 'fil'     // 全名映射到小写 fil
+  };
+
+  // 如果有映射，使用映射后的代码
+  if (langMapping[lowerCode]) {
+    return langMapping[lowerCode];
+  }
+
+  // 检查是否是标准的 xx-XX 格式（如 en-US, zh-CN）
+  if (/^[a-z]{2}-[a-z]{2}$/i.test(langCode)) {
+    // 转换为标准格式：前两位小写，后两位大写
+    const parts = langCode.toLowerCase().split('-');
+    return `${parts[0]}-${parts[1].toUpperCase()}`;
+  }
+
+  // 默认：两字母代码转小写，其他保持原样
+  if (/^[a-z]{2}$/i.test(langCode)) {
+    return langCode.toLowerCase();
+  }
+
+  return langCode;
+}
+
 // MyMemory 免费翻译API
 export async function myMemoryTranslate(text: string, targetLang = 'en', sourceLang = 'zh-cn'): Promise<string> {
-  const sourceLangCode = sourceLang === 'zh-cn' ? 'zh-CN' : sourceLang.toUpperCase();
-  const targetLangCode = targetLang.toUpperCase();
+  const sourceLangCode = mapToMyMemoryLangCode(sourceLang);
+  const targetLangCode = mapToMyMemoryLangCode(targetLang);
   const langPair = `${sourceLangCode}|${targetLangCode}`;
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
 

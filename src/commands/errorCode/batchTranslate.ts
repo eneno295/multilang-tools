@@ -509,8 +509,9 @@ export class BatchTranslateCommand {
   }
 
   private updateTargetFileWithLineNumber(content: string, translatedErrorCodes: Array<{ code: string, message: string, lineNumber: number }>): string {
-    // 如果文件为空，创建新的错误码对象
-    if (!content.trim()) {
+    // 如果文件为空或只有空的错误码对象，创建新的错误码对象
+    const trimmedContent = content.trim();
+    if (!trimmedContent || trimmedContent === 'const errCode = {}' || trimmedContent === 'const errCode = {\n}') {
       const errorCodesText = translatedErrorCodes
         .map(item => `  "${item.code}": "${item.message}"`)
         .join(',\n');
@@ -549,7 +550,8 @@ export class BatchTranslateCommand {
       'ms-MY.js': 'ms',
       'pt-BR.js': 'pt',
       'th-TH.js': 'th',
-      'vi-VN.js': 'vi'
+      'vi-VN.js': 'vi',
+      'tl-PH.js': 'tl',  // 菲律宾语
     };
 
     return languageMap[fileName] || 'en';
@@ -564,6 +566,7 @@ export class BatchTranslateCommand {
   private findErrorCodeLine(lines: string[], code: string): number {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
+      // 匹配 "0001": 或 "0001": "值" 格式
       if (line.match(new RegExp(`^"${code}":`))) {
         return i + 1; // 返回行号（从1开始）
       }

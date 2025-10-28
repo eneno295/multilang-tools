@@ -106,6 +106,5 @@ temp/
 # Test files
 /cypress/videos/
 /cypress/screenshots/
-zh-CN.js
-en-US.ts
-zh-CN.ts
+local
+errCode

@@ -111,6 +111,9 @@ npm install
 # 编译
 npm run compile
 
+# 打包
+npx vsce package
+
 # 在 VSCode 中按 F5 启动调试
 ```
 

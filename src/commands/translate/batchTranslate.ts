@@ -458,7 +458,35 @@ export class BatchTranslateTranslateCommand {
       try {
         parsed = JSON.parse(cleanContent);
       } catch (jsonError) {
-        // 如果不是 JSON，尝试解析为 JavaScript/TypeScript 模块
+        // 如果不是 JSON，尝试使用正则表达式提取键值对
+        // 这种方法更稳健，适合大文件和包含模板字符串的情况
+
+        // 正则匹配模式：
+        // 1. 键：单引号、双引号或无引号
+        // 2. 值：单引号、双引号或反引号
+        const keyValuePattern = /['"]([^'"]+)['"]\s*:\s*(?:`([^`]*)`|'([^']*)'|"([^"]*)")/g;
+        let match;
+
+        while ((match = keyValuePattern.exec(cleanContent)) !== null) {
+          const key = match[1];
+          // 值可能在 match[2]（反引号）、match[3]（单引号）或 match[4]（双引号）
+          const value = match[2] || match[3] || match[4];
+
+          if (key && value !== undefined) {
+            translations.push({
+              key: key,
+              finalKey: key,
+              value: value
+            });
+          }
+        }
+
+        // 如果正则方式找到了翻译，直接返回
+        if (translations.length > 0) {
+          return translations;
+        }
+
+        // 否则尝试传统的 eval 方式（作为备用）
         try {
           let jsContent = cleanContent;
 
@@ -478,6 +506,9 @@ export class BatchTranslateTranslateCommand {
             }
           }
 
+          // 将模板字符串（反引号）转换为普通字符串（单引号）
+          jsContent = jsContent.replace(/`([^`]*)`/g, "'$1'");
+
           // 尝试解析为 JavaScript 对象
           parsed = new Function('return (' + jsContent + ')')();
         } catch (jsError) {
@@ -486,27 +517,29 @@ export class BatchTranslateTranslateCommand {
         }
       }
 
-      // 递归提取所有键值对，保留完整路径和最终键名
-      const extractKeyValues = (obj: any, prefix: string = '') => {
-        if (typeof obj === 'object' && obj !== null) {
-          for (const key in obj) {
-            if (typeof obj[key] === 'string') {
-              // 保留完整路径，包含所有层级
-              const fullKey = prefix ? `${prefix}.${key}` : key;
-              translations.push({
-                key: fullKey,        // 完整路径，用于查找缺失
-                finalKey: key,       // 最终键名，用于添加翻译
-                value: obj[key]
-              });
-            } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-              // 递归处理嵌套对象，传递当前路径作为前缀
-              extractKeyValues(obj[key], prefix ? `${prefix}.${key}` : key);
+      // 如果通过 JSON.parse 或 eval 成功解析，递归提取键值对
+      if (parsed) {
+        const extractKeyValues = (obj: any, prefix: string = '') => {
+          if (typeof obj === 'object' && obj !== null) {
+            for (const key in obj) {
+              if (typeof obj[key] === 'string') {
+                // 保留完整路径，包含所有层级
+                const fullKey = prefix ? `${prefix}.${key}` : key;
+                translations.push({
+                  key: fullKey,        // 完整路径，用于查找缺失
+                  finalKey: key,       // 最终键名，用于添加翻译
+                  value: obj[key]
+                });
+              } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                // 递归处理嵌套对象，传递当前路径作为前缀
+                extractKeyValues(obj[key], prefix ? `${prefix}.${key}` : key);
+              }
             }
           }
-        }
-      };
+        };
 
-      extractKeyValues(parsed);
+        extractKeyValues(parsed);
+      }
     } catch (error) {
       console.error('解析翻译文件失败:', error);
     }
@@ -789,7 +822,10 @@ export class BatchTranslateTranslateCommand {
    */
   private getLanguageFromFileName(fileName: string): string {
     // 移除文件扩展名
-    const nameWithoutExt = fileName.replace(/\.(ts|js|json)$/, '');
+    let nameWithoutExt = fileName.replace(/\.(ts|js|json)$/, '');
+
+    // 将下划线格式转换为连字符格式（如 tl_PH -> tl-PH）
+    nameWithoutExt = nameWithoutExt.replace(/_/g, '-');
 
     // 智能语言识别规则
     const languagePatterns = [

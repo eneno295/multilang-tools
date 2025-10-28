@@ -715,7 +715,7 @@ export class FileOrganizeCommand {
       }
 
       // 检查是否是注释行（新的分组）
-      if (trimmed.startsWith('//') && (trimmed.includes('模块') || trimmed.includes('报错') || trimmed.includes('活动'))) {
+      if (trimmed.startsWith('//')) {
         // 保存前一个分组
         if (currentSection) {
           sections.push({
@@ -732,7 +732,12 @@ export class FileOrganizeCommand {
 
       // 检查是否是错误码行
       const match = trimmed.match(/^["'](\d+)["']\s*:\s*["']/);
-      if (match && currentSection) {
+      if (match) {
+        // 如果没有当前分组，创建一个默认分组
+        if (!currentSection) {
+          currentSection = '  // 错误码';
+          currentErrorCodes = [];
+        }
         currentErrorCodes.push({
           code: match[1],
           line: line
