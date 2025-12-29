@@ -552,6 +552,9 @@ export class BatchTranslateCommand {
       'th-TH.js': 'th',
       'vi-VN.js': 'vi',
       'tl-PH.js': 'tl',  // 菲律宾语
+      'bn-BD.js': 'bn',  // 孟加拉语（孟加拉国）
+      'bn-IN.js': 'bn',  // 孟加拉语（印度）
+      'bn.js': 'bn',     // 孟加拉语
     };
 
     return languageMap[fileName] || 'en';

@@ -844,13 +844,13 @@ export class BatchTranslateTranslateCommand {
 
       // 全名格式：english, chinese, spanish 等
       {
-        pattern: /^(english|chinese|spanish|french|german|japanese|korean|russian|portuguese|italian|dutch|arabic|hindi|thai|vietnamese|indonesian|malay|filipino|tagalog)$/i,
+        pattern: /^(english|chinese|spanish|french|german|japanese|korean|russian|portuguese|italian|dutch|arabic|hindi|thai|vietnamese|indonesian|malay|filipino|tagalog|bengali)$/i,
         language: (match: RegExpMatchArray) => {
           const langMap: { [key: string]: string } = {
             'english': 'en', 'chinese': 'zh', 'spanish': 'es', 'french': 'fr', 'german': 'de',
             'japanese': 'ja', 'korean': 'ko', 'russian': 'ru', 'portuguese': 'pt', 'italian': 'it',
             'dutch': 'nl', 'arabic': 'ar', 'hindi': 'hi', 'thai': 'th', 'vietnamese': 'vi',
-            'indonesian': 'id', 'malay': 'ms', 'filipino': 'tl', 'tagalog': 'tl'
+            'indonesian': 'id', 'malay': 'ms', 'filipino': 'tl', 'tagalog': 'tl', 'bengali': 'bn'
           };
           return langMap[match[1].toLowerCase()] || 'en';
         }
@@ -866,7 +866,7 @@ export class BatchTranslateTranslateCommand {
     }
 
     // 如果都没匹配到，尝试从文件名中提取语言信息
-    const commonLanguages = ['en', 'zh', 'es', 'fr', 'de', 'ja', 'ko', 'ru', 'pt', 'it', 'nl', 'ar', 'hi', 'th', 'vi', 'id', 'ms', 'tl'];
+    const commonLanguages = ['en', 'zh', 'es', 'fr', 'de', 'ja', 'ko', 'ru', 'pt', 'it', 'nl', 'ar', 'hi', 'th', 'vi', 'id', 'ms', 'tl', 'bn'];
     for (const lang of commonLanguages) {
       if (nameWithoutExt.toLowerCase().includes(lang)) {
         return lang;

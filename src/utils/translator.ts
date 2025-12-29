@@ -19,7 +19,10 @@ function mapToMyMemoryLangCode(langCode: string): string {
     'tl': 'tl-PH',        // Tagalog -> Tagalog (Philippines) ✓
     'fil': 'fil',         // Filipino (小写) ✓
     'tagalog': 'tl-PH',   // 全名映射
-    'filipino': 'fil'     // 全名映射到小写 fil
+    'filipino': 'fil',    // 全名映射到小写 fil
+    // 孟加拉语：优先使用 bn-BD 格式（RFC3066 标准，孟加拉国）
+    'bn': 'bn-BD',        // Bengali -> Bengali (Bangladesh) ✓
+    'bengali': 'bn-BD'    // 全名映射
   };
 
   // 如果有映射，使用映射后的代码
