@@ -15,14 +15,17 @@ function mapToMyMemoryLangCode(langCode: string): string {
   const langMapping: { [key: string]: string } = {
     'zh-cn': 'zh-CN',
     'zh': 'zh-CN',
+    'zh-tw': 'zh-TW',
+    'zh-hk': 'zh-HK',
+    'zh-mo': 'zh-MO',
     // 菲律宾语：优先使用 tl-PH 格式（RFC3066 标准）
     'tl': 'tl-PH',        // Tagalog -> Tagalog (Philippines) ✓
     'fil': 'fil',         // Filipino (小写) ✓
     'tagalog': 'tl-PH',   // 全名映射
     'filipino': 'fil',    // 全名映射到小写 fil
-    // 孟加拉语：优先使用 bn-BD 格式（RFC3066 标准，孟加拉国）
-    'bn': 'bn-BD',        // Bengali -> Bengali (Bangladesh) ✓
-    'bengali': 'bn-BD'    // 全名映射
+    // 孟加拉语：MyMemory 可能不支持 bn-BD，使用简单格式 bn
+    'bn': 'bn',           // Bengali -> 使用简单格式
+    'bengali': 'bn'       // 全名映射
   };
 
   // 如果有映射，使用映射后的代码
@@ -85,6 +88,21 @@ export async function myMemoryTranslate(text: string, targetLang = 'en', sourceL
   return translatedText;
 }
 
+// 检查文本是否主要是英文（简单检测）
+function isLikelyEnglish(text: string): boolean {
+  // 检查是否包含中文字符
+  const chineseRegex = /[\u4e00-\u9fa5]/;
+  if (chineseRegex.test(text)) {
+    return false; // 包含中文，不是英文
+  }
+  // 检查是否包含其他非拉丁字符（如孟加拉语、阿拉伯语等）
+  const nonLatinRegex = /[^\x00-\x7F\u00A0-\u00FF]/;
+  if (nonLatinRegex.test(text)) {
+    return false; // 包含非拉丁字符，可能是其他语言
+  }
+  return true; // 主要是拉丁字符，可能是英文
+}
+
 // 统一翻译接口（直接使用 MyMemory）
 export async function translateWithFallback(text: string, targetLang = 'en', sourceLang = 'zh-cn'): Promise<{ text: string, service: string }> {
   try {
@@ -96,6 +114,21 @@ export async function translateWithFallback(text: string, targetLang = 'en', sou
         result.includes('INVALID SOURCE LANGUAGE') ||
         result.includes('LANGPAIR=')) {
         throw new Error(`翻译服务返回错误: ${result}`);
+      }
+
+      // 如果目标语言不是英文，但翻译结果是英文，说明翻译失败，抛出错误
+      const targetLangLower = targetLang.toLowerCase();
+      if (targetLangLower !== 'en' && targetLangLower !== 'english') {
+        // 检查源文本和目标文本是否相似（可能是翻译失败返回了原文或英文）
+        if (isLikelyEnglish(result) && isLikelyEnglish(text)) {
+          // 如果源文本和目标文本都是英文，可能是翻译失败
+          // 检查是否完全相同或非常相似
+          if (result.toLowerCase().trim() === text.toLowerCase().trim() ||
+            result.toLowerCase().includes(text.toLowerCase()) ||
+            text.toLowerCase().includes(result.toLowerCase())) {
+            throw new Error(`翻译失败: 返回了英文结果，可能不支持目标语言 ${targetLang}`);
+          }
+        }
       }
 
       // 直接返回 MyMemory 服务标识

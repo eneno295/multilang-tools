@@ -830,7 +830,18 @@ export class BatchTranslateTranslateCommand {
     // 智能语言识别规则
     const languagePatterns = [
       // 标准格式：en-US, zh-CN, es-ES 等
-      { pattern: /^([a-z]{2})-([A-Z]{2})$/i, language: (match: RegExpMatchArray) => match[1].toLowerCase() },
+      // 注意：中文需要区分区域（例如 zh-TW 繁体）
+      {
+        pattern: /^([a-z]{2})-([A-Z]{2})$/i,
+        language: (match: RegExpMatchArray) => {
+          const lang = match[1].toLowerCase();
+          const region = match[2].toUpperCase();
+          if (lang === 'zh' && (region === 'TW' || region === 'HK' || region === 'MO')) {
+            return `zh-${region.toLowerCase()}`; // zh-tw / zh-hk / zh-mo
+          }
+          return lang;
+        }
+      },
 
       // 简化格式：EN, CN, ES 等
       {
@@ -844,13 +855,14 @@ export class BatchTranslateTranslateCommand {
 
       // 全名格式：english, chinese, spanish 等
       {
-        pattern: /^(english|chinese|spanish|french|german|japanese|korean|russian|portuguese|italian|dutch|arabic|hindi|thai|vietnamese|indonesian|malay|filipino|tagalog|bengali)$/i,
+        pattern: /^(english|chinese|spanish|french|german|japanese|korean|russian|portuguese|italian|dutch|arabic|hindi|thai|vietnamese|indonesian|malay|filipino|tagalog|bengali|traditionalchinese|chinesetraditional|chinese-traditional)$/i,
         language: (match: RegExpMatchArray) => {
           const langMap: { [key: string]: string } = {
             'english': 'en', 'chinese': 'zh', 'spanish': 'es', 'french': 'fr', 'german': 'de',
             'japanese': 'ja', 'korean': 'ko', 'russian': 'ru', 'portuguese': 'pt', 'italian': 'it',
             'dutch': 'nl', 'arabic': 'ar', 'hindi': 'hi', 'thai': 'th', 'vietnamese': 'vi',
-            'indonesian': 'id', 'malay': 'ms', 'filipino': 'tl', 'tagalog': 'tl', 'bengali': 'bn'
+            'indonesian': 'id', 'malay': 'ms', 'filipino': 'tl', 'tagalog': 'tl', 'bengali': 'bn',
+            'traditionalchinese': 'zh-tw', 'chinesetraditional': 'zh-tw', 'chinese-traditional': 'zh-tw'
           };
           return langMap[match[1].toLowerCase()] || 'en';
         }
@@ -866,7 +878,7 @@ export class BatchTranslateTranslateCommand {
     }
 
     // 如果都没匹配到，尝试从文件名中提取语言信息
-    const commonLanguages = ['en', 'zh', 'es', 'fr', 'de', 'ja', 'ko', 'ru', 'pt', 'it', 'nl', 'ar', 'hi', 'th', 'vi', 'id', 'ms', 'tl', 'bn'];
+    const commonLanguages = ['en', 'zh', 'zh-tw', 'zh-hk', 'zh-mo', 'es', 'fr', 'de', 'ja', 'ko', 'ru', 'pt', 'it', 'nl', 'ar', 'hi', 'th', 'vi', 'id', 'ms', 'tl', 'bn'];
     for (const lang of commonLanguages) {
       if (nameWithoutExt.toLowerCase().includes(lang)) {
         return lang;

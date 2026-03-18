@@ -542,15 +542,23 @@ export class BatchTranslateCommand {
   private getLanguageFromFileName(fileName: string): string {
     // 根据文件名映射到语言代码
     const languageMap: { [key: string]: string } = {
-      'en-US.js': 'en',
-      'es-ES.js': 'es',
-      'hi-IN.js': 'hi',
-      'id-ID.js': 'id',
-      'ja-JP.js': 'ja',
-      'ms-MY.js': 'ms',
-      'pt-BR.js': 'pt',
-      'th-TH.js': 'th',
-      'vi-VN.js': 'vi',
+      'en-US.js': 'en', // 英语（美国）
+      'it-IT.js': 'it', // 意大利语（意大利）
+      'fr-FR.js': 'fr', // 法语（法国）
+      'de-DE.js': 'de', // 德语（德国）
+      'nl-NL.js': 'nl', // 荷兰语（荷兰）
+      'ar-SA.js': 'ar', // 阿拉伯语（沙特阿拉伯）
+      'ru-RU.js': 'ru', // 俄语（俄罗斯）
+      'ko-KR.js': 'ko', // 韩语（韩国）
+      'zh-TW.js': 'zh-tw', // 繁体中文（台湾）
+      'es-ES.js': 'es', // 西班牙语（西班牙）
+      'hi-IN.js': 'hi', // 印地语（印度）
+      'id-ID.js': 'id', // 印尼语（印度尼西亚）
+      'ja-JP.js': 'ja', // 日语（日本）
+      'ms-MY.js': 'ms', // 马来语（马来西亚）
+      'pt-BR.js': 'pt', // 葡萄牙语（巴西）
+      'th-TH.js': 'th', // 泰语（泰国） 
+      'vi-VN.js': 'vi', // 越南语（越南）
       'tl-PH.js': 'tl',  // 菲律宾语
       'bn-BD.js': 'bn',  // 孟加拉语（孟加拉国）
       'bn-IN.js': 'bn',  // 孟加拉语（印度）
