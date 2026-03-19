@@ -540,32 +540,61 @@ export class BatchTranslateCommand {
   }
 
   private getLanguageFromFileName(fileName: string): string {
-    // 根据文件名映射到语言代码
+    // 去掉扩展名，统一用“语言-地区”或“语言”作为 key，兼容 .js / .ts / .json
+    const baseName = fileName.replace(/\.(js|ts|json)$/i, '').replace(/_/g, '-');
+    const key = baseName; // 如 it-IT、fr-FR、it、zh-TW
+
+    // 先按完整 key 匹配（含大小写）
     const languageMap: { [key: string]: string } = {
-      'en-US.js': 'en', // 英语（美国）
-      'it-IT.js': 'it', // 意大利语（意大利）
-      'fr-FR.js': 'fr', // 法语（法国）
-      'de-DE.js': 'de', // 德语（德国）
-      'nl-NL.js': 'nl', // 荷兰语（荷兰）
-      'ar-SA.js': 'ar', // 阿拉伯语（沙特阿拉伯）
-      'ru-RU.js': 'ru', // 俄语（俄罗斯）
-      'ko-KR.js': 'ko', // 韩语（韩国）
-      'zh-TW.js': 'zh-tw', // 繁体中文（台湾）
-      'es-ES.js': 'es', // 西班牙语（西班牙）
-      'hi-IN.js': 'hi', // 印地语（印度）
-      'id-ID.js': 'id', // 印尼语（印度尼西亚）
-      'ja-JP.js': 'ja', // 日语（日本）
-      'ms-MY.js': 'ms', // 马来语（马来西亚）
-      'pt-BR.js': 'pt', // 葡萄牙语（巴西）
-      'th-TH.js': 'th', // 泰语（泰国） 
-      'vi-VN.js': 'vi', // 越南语（越南）
-      'tl-PH.js': 'tl',  // 菲律宾语
-      'bn-BD.js': 'bn',  // 孟加拉语（孟加拉国）
-      'bn-IN.js': 'bn',  // 孟加拉语（印度）
-      'bn.js': 'bn',     // 孟加拉语
+      'en-US': 'en', // 英语（美国）
+      'it-IT': 'it', // 意大利语（意大利）
+      'fr-FR': 'fr', // 法语（法国）
+      'de-DE': 'de', // 德语（德国）
+      'nl-NL': 'nl', // 荷兰语（荷兰）
+      'ar-SA': 'ar', // 阿拉伯语（沙特阿拉伯）
+      'ru-RU': 'ru', // 俄语（俄罗斯）
+      'ko-KR': 'ko', // 韩语（韩国）
+      'zh-TW': 'zh-tw', // 繁体中文（台湾）
+      'zh-tw': 'zh-tw', // 繁体中文（台湾）
+      'es-ES': 'es', // 西班牙语（西班牙）
+      'hi-IN': 'hi', // 印地语（印度）
+      'id-ID': 'id', // 印尼语（印度尼西亚）
+      'ja-JP': 'ja', // 日语（日本）
+      'ms-MY': 'ms', // 马来语（马来西亚）
+      'pt-BR': 'pt', // 葡萄牙语（巴西）
+      'th-TH': 'th', // 泰语（泰国）
+      'vi-VN': 'vi', // 越南语（越南）
+      'tl-PH': 'tl', // 菲律宾语（菲律宾）
+      'bn-BD': 'bn', // 孟加拉语（孟加拉国）
+      'bn-IN': 'bn', // 孟加拉语（印度）
+      'bn': 'bn', // 孟加拉语（孟加拉国）
+      'en': 'en',
+      'it': 'it',
+      'fr': 'fr',
+      'de': 'de',
+      'nl': 'nl',
+      'ar': 'ar',
+      'ru': 'ru',
+      'ko': 'ko',
+      'es': 'es',
+      'hi': 'hi',
+      'id': 'id',
+      'ja': 'ja',
+      'ms': 'ms',
+      'pt': 'pt',
+      'th': 'th',
+      'vi': 'vi',
+      'tl': 'tl',
     };
 
-    return languageMap[fileName] || 'en';
+    if (languageMap[key]) {
+      return languageMap[key];
+    }
+    // 再试小写（如 zh-tw）
+    if (languageMap[key.toLowerCase()]) {
+      return languageMap[key.toLowerCase()];
+    }
+    return 'en';
   }
 
   /**
